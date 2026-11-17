@@ -1,0 +1,10 @@
+{
+  "name": "dbschema",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Schemas de BDD relationnelles : HTML interactif, PNG, SQL, mise en page Workbench.",
+  "engines": { "node": ">=18" },
+  "dependencies": { "elkjs": "0.12.0" }
+}
