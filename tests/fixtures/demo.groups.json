@@ -1,0 +1,8 @@
+{
+ "CLIENTS": ["users", "user_profiles", "addresses", "countries"],
+ "CATALOGUE": ["categories", "publishers", "authors", "books", "book_authors"],
+ "STOCK": ["warehouses", "stock_levels"],
+ "COMMANDES": ["orders", "order_items", "payments", "shipments", "coupons"],
+ "AVIS": ["reviews", "wishlists"],
+ "ADMIN": ["audit_logs"]
+}
