@@ -43,7 +43,7 @@ ok('table isolee presente', 'isolated' in m['tables'])
 
 # 2. mise en page + controles + sorties
 code, out = run(['node', os.path.join(LIB, 'build.mjs'), m_path, os.path.join(tmp, 'edge_out'), 'EDGE'])
-ok('build edge-cases (controles OK)', code == 0, ' | '.join(l for l in out.splitlines() if l.startswith('[')))
+ok('build edge-cases (controles OK)', code == 0, ' | '.join(l for l in out.splitlines() if l.startswith('[')) if code == 0 else out.strip()[-600:])
 lay = json.load(open(os.path.join(tmp, 'edge_out', '_build', 'layout_all.json'), encoding='utf-8'))
 ok('hub detecte', lay['hubs'] == ['hub'], lay['hubs'])
 ok('9 liens hub en amorces', len(lay['splits']) == 9, len(lay['splits']))
@@ -87,9 +87,12 @@ for bad, why in (({'nope.parent_id': {'child': '1..N'}}, 'cle inconnue'), ({'chi
 
 # Laravel : une migration vers une autre connexion est refusee AVANT migrate
 spec = importlib.util.spec_from_file_location('extract', os.path.join(LIB, 'extract.py')); ex = importlib.util.module_from_spec(spec); spec.loader.exec_module(ex)
+# deux depots distincts : un dossier temporaire reutilise ne melange pas le cas sain et le cas piege
+ok_mig = os.path.join(tmp, 'lara_ok', 'database', 'migrations'); os.makedirs(ok_mig, exist_ok=True)
+open(os.path.join(ok_mig, 'a.php'), 'w').write("<?php Schema::connection('mysql')->create('a', fn() => 1);")
+ok('Laravel : connexion mysql explicite acceptee', ex.foreign_connections(os.path.join(tmp, 'lara_ok')) == [],
+   ex.foreign_connections(os.path.join(tmp, 'lara_ok')))
 mig = os.path.join(tmp, 'lara', 'database', 'migrations'); os.makedirs(mig, exist_ok=True)
-open(os.path.join(mig, 'a.php'), 'w').write("<?php Schema::connection('mysql')->create('a', fn() => 1);")
-ok('Laravel : connexion mysql explicite acceptee', ex.foreign_connections(os.path.join(tmp, 'lara')) == [])
 open(os.path.join(mig, 'b.php'), 'w').write("<?php Schema::connection('legacy')->create('b'); class B { protected $connection = $x; }\n"
                                             "class C { public function getConnection() { return 'legacy'; } }\nDB::statement('USE prod');\n"
                                             "DB::table('prod.users')->truncate(); config(['database.connections.mysql.database' => 'prod']);\n"
@@ -139,6 +142,10 @@ ok('aller-retour : le SQL exporte (mysqldump) redonne exactement la meme structu
 # 5. bac a sable : l'utilisateur jetable n'ecrit que dans sa base (base temoin zz_dbschema_victim)
 code, out = run([sys.executable, '-I', os.path.join(HERE, 'sandbox_test.py'), LIB])
 ok('bac a sable MySQL', code == 0, ' | '.join(l for l in out.splitlines() if 'ECHEC' in l) or '%d verifications' % out.count('[OK]'))
+
+# 5b. constats de l'audit de securite (vol ou acces a des donnees)
+code, out = run([sys.executable, '-I', os.path.join(HERE, 'security_test.py'), LIB, os.path.join(tmp, 'sec')])
+ok('securite : non-regression de l\'audit', code == 0, ' | '.join(l for l in out.splitlines() if 'ECHEC' in l) or '%d verifications' % out.count('[OK]'))
 
 # 6. aucune base ni utilisateur jetable restant
 code, out = run([sys.executable, '-I', '-c', 'import sys; sys.path.insert(0, sys.argv[1]); import extract; '

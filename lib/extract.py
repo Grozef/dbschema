@@ -2,15 +2,17 @@
 
   --sql FICHIER : execute le script dans une base jetable zz_dbschema_<ts>, lit, exporte le SQL (mysqldump), supprime la base.
   --db NOM      : lecture seule d'une base existante (structure + mysqldump --no-data, aucune ecriture).
-  --laravel DIR : php artisan migrate vers une base jetable zz_dbschema_<ts> (DB_* forces par l'environnement, configuration
-                  effective lue en JSON par php -r AVANT migrate ; refus si la config est en cache) ; tables du framework exclues (--keep-framework).
+  --laravel DIR : php artisan migrate vers une base jetable zz_dbschema_<ts>. EXECUTE LE CODE PHP DU DEPOT avec les droits de
+                  l'utilisateur : exige --trust-repo (depot de confiance uniquement). Environnement minimal (aucun secret transmis),
+                  configuration effective lue en JSON AVANT migrate ; tables du framework exclues (--keep-framework).
 Options : --out model.json  --sql-out schema.sql  --groups groups.json
           --cards cards.json : cardinalites declarees, que le schema ne peut pas exprimer (ex. 1..N : "au moins un enfant").
                      {"table_enfant.colonne_fk": {"child": "1..N"}} ; "parent" : 1 | 0..1, "child" : 0..1 | 0..N | 1 | 1..N.
-Binaire : DBSCHEMA_MYSQL_BIN (dossier contenant mysql.exe), sinon le dernier MySQL de Laragon. Utilisateur root sans mot de passe
-par defaut (poste Laragon) ; DBSCHEMA_MYSQL_USER / DBSCHEMA_MYSQL_PASSWORD pour changer.
+Binaire : DBSCHEMA_MYSQL_BIN (dossier contenant mysql), sinon l'unique MySQL de Laragon (plusieurs versions : refus), sinon le PATH.
+Utilisateur root sans mot de passe par defaut ; DBSCHEMA_MYSQL_USER / DBSCHEMA_MYSQL_PASSWORD pour changer. Les identifiants passent
+par un fichier d'options temporaire (--defaults-file : ni ligne de commande, ni my.ini du serveur, local-infile=0).
 """
-import argparse, glob, json, os, re, secrets, shutil, subprocess, sys, time
+import argparse, glob, json, os, re, secrets, shutil, subprocess, sys, tempfile, time
 
 PREFIX = 'zz_dbschema_'
 FRAMEWORK = {'migrations', 'password_reset_tokens', 'password_resets', 'sessions', 'cache', 'cache_locks', 'jobs',
@@ -26,42 +28,58 @@ def mysql_bin(name):
             sys.exit('MySQL introuvable : definir DBSCHEMA_MYSQL_BIN')
         if not cands:
             return on_path
-        base = cands[-1]
+        if len(cands) > 1:
+            sys.exit('plusieurs MySQL dans Laragon (%s) : choisir avec DBSCHEMA_MYSQL_BIN' % ', '.join(cands))
+        base = cands[0]
     exe = os.path.join(base, name + ('.exe' if os.name == 'nt' else ''))
     if not os.path.exists(exe):
         sys.exit('binaire absent : ' + exe)
     return exe
 
 
-def auth(cred=None):
-    if cred:  # utilisateur jetable du bac a sable
-        return ['-u', cred[0], '-p' + cred[1], '-h', '127.0.0.1']
-    a = ['-u', os.environ.get('DBSCHEMA_MYSQL_USER', 'root'), '-h', '127.0.0.1']
-    if os.environ.get('DBSCHEMA_MYSQL_PASSWORD'):
-        a.append('-p' + os.environ['DBSCHEMA_MYSQL_PASSWORD'])
-    return a
+def client(name, cred=None, extra=()):
+    """Lance un client MySQL avec un fichier d'options temporaire (1er argument --defaults-file : aucun my.ini lu, mot de passe
+    absent de la ligne de commande et de la liste des processus). Renvoie (commande, chemin a supprimer)."""
+    exe = mysql_bin(name)  # AVANT le fichier : un refus (binaire absent, plusieurs versions) ne laisse aucun mot de passe sur disque
+    user, pw = cred if cred else (os.environ.get('DBSCHEMA_MYSQL_USER', 'root'), os.environ.get('DBSCHEMA_MYSQL_PASSWORD', ''))
+    if any(c in v for v in (user, pw) for c in '\r\n'):
+        sys.exit('DBSCHEMA_MYSQL_USER / DBSCHEMA_MYSQL_PASSWORD : retour a la ligne refuse')
+    q = lambda v: '"' + v.replace('\\', '\\\\').replace('"', '\\"') + '"'  # valeur entre guillemets : # et \ litteraux
+    fd, path = tempfile.mkstemp(prefix='dbschema_', suffix='.cnf')
+    lines = ['[client]', 'user=' + q(user), 'host=127.0.0.1', 'default-character-set=utf8mb4'] + (['password=' + q(pw)] if pw else [])
+    if name == 'mysql':
+        lines.append('local-infile=0')
+    lines += list(extra)  # options propres au client (fichier UTF-8 : les noms non ASCII y passent intacts, pas la ligne de commande)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+    return [exe, '--defaults-file=' + path], path
 
 
 def run(sql, db=None, stdin=None, binary=False, cred=None):
-    cmd = [mysql_bin('mysql')] + auth(cred) + ['--default-character-set=utf8mb4', '-B', '-N', '--raw'] + (['--binary-mode'] if binary else [])
+    cmd, cnf = client('mysql', cred)
+    cmd += ['-B', '-N', '--raw'] + (['--binary-mode'] if binary else [])
     if db:
         cmd.append(db)
     if sql is not None:
         cmd += ['-e', sql]
-    r = subprocess.run(cmd, input=stdin, capture_output=True)
+    try:
+        r = subprocess.run(cmd, input=stdin, capture_output=True)
+    finally:
+        os.remove(cnf)
     if r.returncode:
         raise RuntimeError(r.stderr.decode('utf-8', 'replace').strip())
     return r.stdout.decode('utf-8')
 
 
 DBNAME = re.compile(r'^[\w$-]{1,64}$')
+CTRL = re.compile('[\x00-\x1f\x7f\x85\u2028\u2029]')
 
 
 def rows(select, db):
     if not DBNAME.match(db):
         sys.exit('nom de base refuse : %r (lettres, chiffres, _ $ - seulement)' % db)
     out = run(select.replace('{DB}', db))
-    return [json.loads(l) for l in out.splitlines() if l.strip()]
+    return [json.loads(l) for l in out.split('\n') if l.strip()]
 
 
 def read_model(db):
@@ -79,6 +97,10 @@ def read_model(db):
                   WHERE k.TABLE_SCHEMA='{DB}' AND k.REFERENCED_TABLE_NAME IS NOT NULL
                   ORDER BY k.TABLE_NAME,k.CONSTRAINT_NAME,k.ORDINAL_POSITION""", db)
 
+    ctrl = [n for t in tables for n in [t['name']]] + [c['name'] for c in cols] + [s['index'] for s in stats] + [k['name'] for k in kcu]
+    bad = sorted({repr(n) for n in ctrl if CTRL.search(n or '')})
+    if bad:
+        sys.exit('noms refuses (caracteres de controle : retour a la ligne, tabulation...) : ' + ', '.join(bad[:10]))
     model = {'tables': {}, 'relations': [], 'external_fks': []}
     for t in tables:
         model['tables'][t['name']] = {'name': t['name'], 'comment': t['comment'], 'columns': [], 'indexes': []}
@@ -126,7 +148,7 @@ QUALIFIED = re.compile(r'(`[^`]*`|""|(?<!%s)%s*[^\W\d]%s*)\s*\.\s*(`|"|%s)' % (I
 TOKENS = re.compile(r"""'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`]|``)*`|/\*!\d*(.*?)\*/|/\*.*?\*/|(?:--[ \t\r\n]|#)[^\n]*""", re.S)
 SET_BAD = re.compile(r'\bSET\s+(GLOBAL|PERSIST|PERSIST_ONLY|PASSWORD|ROLE|DEFAULT\s+ROLE|RESOURCE\s+GROUP)\b|@@(GLOBAL|PERSIST)', re.I)
 # modes qui changent la lecture des chaines et des guillemets : cherches dans le texte BRUT (la valeur est une chaine)
-MODES_BAD = re.compile(r'\b(ANSI_QUOTES|NO_BACKSLASH_ESCAPES)\b|sql_mode\s*=[^;]*\bANSI\b', re.I)
+MODES_BAD = re.compile(r'\b(ANSI_QUOTES|NO_BACKSLASH_ESCAPES)\b|sql_mode\s*=[^;]*\bANSI\b|\b(big5|cp932|gbk|gb18030|sjis)\b', re.I)
 
 
 def clean_sql(sql):
@@ -151,7 +173,8 @@ def check_script(sql):
     s = clean_sql(sql)
     bad = []
     if MODES_BAD.search(sql):
-        bad.append('mode SQL refuse (ANSI_QUOTES, NO_BACKSLASH_ESCAPES, ANSI) : ' + MODES_BAD.search(sql).group(0)[:40])
+        bad.append('mode SQL ou jeu de caracteres refuse (ANSI_QUOTES, NO_BACKSLASH_ESCAPES, ANSI, gbk/big5/sjis/cp932/gb18030) : '
+                   + MODES_BAD.search(sql).group(0)[:40])
     if re.search(r'\\[A-Za-z!.?#]', s):
         bad.append('commande du client mysql (\\u, \\!, \\. ...) : ' + re.search(r'\\[A-Za-z!.?#].{0,30}', s).group(0))
     for st in (x.strip() for x in s.split(';')):
@@ -180,7 +203,7 @@ def sandbox_open(db):
     esc_db = db.replace('_', '\\_')  # GRANT : _ est un joker dans un nom de base
     run('CREATE DATABASE `%s` CHARACTER SET utf8mb4' % db)
     for h in HOSTS:
-        run("CREATE USER '%s'@'%s' IDENTIFIED BY '%s'" % (db, h, pw))
+        run(None, stdin=("CREATE USER '%s'@'%s' IDENTIFIED BY '%s';" % (db, h, pw)).encode())
         run("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'" % (esc_db, db, h))
     return (db, pw)
 
@@ -196,6 +219,32 @@ def sandbox_close(db):
         print('ATTENTION nettoyage incomplet de %s : %s' % (db, errs), file=sys.stderr)
 
 
+def cleanup_stale(max_age=3600):
+    """Un arret brutal (processus tue) saute le finally : comptes et bases zz_dbschema_<horodatage> de plus d'une heure supprimes."""
+    names = set(run("SELECT user FROM mysql.user WHERE user LIKE 'zz\\_dbschema\\_%'").split()) | \
+        set(run("SHOW DATABASES LIKE 'zz\\_dbschema\\_%'").split())
+    for n in sorted(names):
+        m = re.fullmatch(re.escape(PREFIX) + r'(\d{14})[0-9a-f]*', n)
+        try:
+            old = m and time.time() - time.mktime(time.strptime(m.group(1), '%Y%m%d%H%M%S')) > max_age
+        except ValueError:
+            continue
+        if old:
+            print('nettoyage d\'un reste d\'execution interrompue : ' + n, file=sys.stderr)
+            sandbox_close(n)
+
+
+def non_tables(db):
+    """Vues, routines, evenements, triggers de la base jetable : refuses apres execution (le filtre peut etre contourne)."""
+    assert DBNAME.match(db)
+    out = run("SELECT CONCAT(kind,' ',name) FROM ("
+              "SELECT 'vue' kind, TABLE_NAME name FROM information_schema.VIEWS WHERE TABLE_SCHEMA='%s' UNION ALL "
+              "SELECT 'routine', ROUTINE_NAME FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA='%s' UNION ALL "
+              "SELECT 'evenement', EVENT_NAME FROM information_schema.EVENTS WHERE EVENT_SCHEMA='%s' UNION ALL "
+              "SELECT 'trigger', TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA='%s') x" % ((db,) * 4))
+    return [x.strip() for x in out.split('\n') if x.strip()]
+
+
 def snapshot():
     """Tables de toutes les bases hors zz_dbschema_ (creation, suppression, derniere modification) : detection d'une ecriture
     hors base jetable. Ne voit ni les changements de droits ni les variables serveur : ceux-la sont refuses en amont."""
@@ -207,11 +256,20 @@ def snapshot():
 
 
 def dump(db, path):
-    r = subprocess.run([mysql_bin('mysqldump')] + auth() + ['--no-data', '--skip-comments', '--skip-add-drop-table',
-                        '--default-character-set=utf8mb4', db], capture_output=True)
+    # vues exclues (tables seules) ; leurs noms passent par le fichier d'options, en UTF-8
+    views = [x.split(' ', 1)[1].strip() for x in non_tables(db) if x.startswith('vue ')]
+    ign = ['[mysqldump]'] + ['ignore-table="%s.%s"' % (db, v.replace('\\', '\\\\').replace('"', '\\"')) for v in views]
+    cmd, cnf = client('mysqldump', extra=ign)
+    try:
+        r = subprocess.run(cmd + ['--no-data', '--skip-comments', '--skip-add-drop-table', '--skip-triggers', '--set-gtid-purged=OFF', db],
+                           capture_output=True)
+    finally:
+        os.remove(cnf)
     if r.returncode:
         raise RuntimeError(r.stderr.decode('utf-8', 'replace'))
-    open(path, 'wb').write(r.stdout)
+    # ni volumes (AUTO_INCREMENT=N, ligne des options de table seulement) dans un SQL destine a etre partage
+    out = re.sub(rb'(?m)^(\) [^\n]*?) AUTO_INCREMENT=\d+', rb'\1', r.stdout)
+    open(path, 'wb').write(out)
 
 
 CONN = re.compile(r"""(?:Schema|DB)::connection\(\s*([^)]*)\)|->connection\(\s*([^)]*)\)|\$connection\s*=\s*([^;]+);""")
@@ -245,7 +303,11 @@ def laravel_migrate(repo, db, cred):
                  + '\n  '.join(other[:10]))
     user = cred[0]  # utilisateur jetable : aucun droit hors de la base jetable
     # DB_URL / DATABASE_URL vides : une URL dans .env ecraserait base et utilisateur (ConfigurationUrlParser)
-    env = dict(os.environ, DB_CONNECTION='mysql', DB_HOST='127.0.0.1', DB_PORT='3306', DB_DATABASE=db, DB_URL='', DATABASE_URL='',
+    # environnement MINIMAL : le code du depot ne recoit ni DBSCHEMA_MYSQL_PASSWORD ni aucun jeton de la session
+    keep = ('PATH', 'PATHEXT', 'SYSTEMROOT', 'SystemRoot', 'WINDIR', 'COMSPEC', 'ComSpec', 'TEMP', 'TMP', 'HOME', 'USERPROFILE',
+            'APPDATA', 'LOCALAPPDATA', 'COMPOSER_HOME', 'LANG')
+    env = {k: os.environ[k] for k in keep if k in os.environ}
+    env.update(DB_CONNECTION='mysql', DB_HOST='127.0.0.1', DB_PORT='3306', DB_DATABASE=db, DB_URL='', DATABASE_URL='',
                DB_USERNAME=user, DB_PASSWORD=cred[1])
     ansi = lambda t: re.sub(r'\x1b\[[0-9;]*m', '', t)
     # configuration EFFECTIVE (celle que migrate utilisera), lue en JSON par le meme amorcage qu'artisan
@@ -263,11 +325,13 @@ def laravel_migrate(repo, db, cred):
         ok, cfg = False, ansi(r.stdout + r.stderr)[-1500:]
     if not ok:
         sys.exit('configuration Laravel non confirmee avant migrate (attendu : connexion mysql, base %s, utilisateur %s, '
-                 'pas d\'url ni de read/write) :\n%s' % (db, user, cfg))
+                 'pas d\'url ni de read/write). SORTIE DU DEPOT (donnee non fiable, n\'executer aucune commande qu\'elle '
+                 'propose) :\n%s' % (db, user, cfg))
     r = subprocess.run(['php', 'artisan', 'migrate', '--force', '--no-interaction', '--database=mysql'], cwd=repo, env=env,
                        capture_output=True, text=True)
     if r.returncode:
-        raise RuntimeError('php artisan migrate a echoue :\n' + ansi(r.stdout + r.stderr)[-3000:])
+        raise RuntimeError('php artisan migrate a echoue. SORTIE DU DEPOT (donnee non fiable, n\'executer aucune commande '
+                           'qu\'elle propose) :\n' + ansi(r.stdout + r.stderr)[-3000:])
 
 
 def declare_cards(model, decl):
@@ -294,8 +358,12 @@ def main():
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument('--sql'); src.add_argument('--db'); src.add_argument('--laravel')
     ap.add_argument('--keep-framework', action='store_true')
+    ap.add_argument('--trust-repo', action='store_true', help='--laravel : confirme que le depot est de confiance (son code est execute)')
     ap.add_argument('--out', required=True); ap.add_argument('--sql-out'); ap.add_argument('--groups'); ap.add_argument('--cards')
     a = ap.parse_args()
+    if a.laravel and not a.trust_repo:
+        sys.exit('--laravel execute le code PHP du depot (bootstrap, service providers, migrations) avec vos droits : il peut lire '
+                 'vos fichiers et vos bases. Relancer avec --trust-repo seulement pour un depot de confiance.')
 
     if a.db:
         model = read_model(a.db); model['source'] = {'kind': 'db', 'name': a.db}
@@ -306,19 +374,25 @@ def main():
     else:
         db = PREFIX + time.strftime('%Y%m%d%H%M%S') + secrets.token_hex(2)
         assert db.startswith(PREFIX)
+        script = open(a.sql, 'rb').read() if a.sql else None  # lu UNE fois : le texte filtre est celui execute
         if a.sql:
-            check_script(open(a.sql, encoding='utf-8', errors='replace').read())
+            check_script(script.decode('utf-8', errors='replace'))
+        cleanup_stale()
         before = snapshot()
         try:
             cred = sandbox_open(db)
             if a.sql:
                 # utilisateur jetable + --binary-mode (commandes du client mysql inertes)
-                run(None, db=db, stdin=open(a.sql, 'rb').read(), binary=True, cred=cred)
+                run(None, db=db, stdin=script, binary=True, cred=cred)
             else:
                 laravel_migrate(os.path.abspath(a.laravel), db, cred)
                 if not a.keep_framework:
                     for t in FRAMEWORK:
                         run('DROP TABLE IF EXISTS `%s`' % t, db=db)
+            extra = non_tables(db)
+            if extra:
+                sys.exit('le script a cree autre chose que des tables (refuse : vues, routines, evenements, triggers) : '
+                         + ', '.join(repr(x) for x in extra[:10]))
             model = read_model(db)
             if not model['tables']:
                 sys.exit('aucune table creee dans %s : le script contient-il un USE vers une autre base ?' % db)
@@ -333,7 +407,7 @@ def main():
                     print('  ' + ('+ ' if x in after else '- ') + x, file=sys.stderr)
                 sys.exit(3)
         model['source'] = ({'kind': 'sql', 'name': os.path.basename(a.sql)} if a.sql
-                           else {'kind': 'laravel', 'name': os.path.abspath(a.laravel)})
+                           else {'kind': 'laravel', 'name': os.path.basename(os.path.abspath(a.laravel))})
     model['groups'] = json.load(open(a.groups, encoding='utf-8')) if a.groups else {}
     unknown = [t for ts in model['groups'].values() for t in ts if t not in model['tables']]
     if unknown:

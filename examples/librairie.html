@@ -1,5 +1,5 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DEMO</title>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob: data:; connect-src 'none'; form-action 'none'; base-uri 'none'"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Librairie (démo)</title>
 <style>
 :root{--ui:#f6f7f9;--uib:#d9dee5;--uit:#1f2328;--uim:#6a737d;--acc:#d9480f;--panel:#fff;color-scheme:light}
 :root[data-theme=dark]{--ui:#1b1e24;--uib:#343a45;--uit:#e6e8ec;--uim:#98a1b0;--panel:#22262d;color-scheme:dark}
@@ -47,7 +47,7 @@ aside a{color:var(--acc);cursor:pointer;text-decoration:underline}
 .erd .tbl.match .card-bd{stroke:#e8590c;stroke-width:3;stroke-dasharray:6 3}
 </style></head><body>
 <header>
- <h1>DEMO</h1>
+ <h1>Librairie (démo)</h1>
  <span class="stat">19 tables &middot; 31 relations</span>
  <input type="search" id="q" placeholder="Rechercher une table ou une colonne" list="names">
  <datalist id="names"><option value="addresses"><option value="audit_logs"><option value="authors"><option value="book_authors"><option value="books"><option value="categories"><option value="countries"><option value="coupons"><option value="order_items"><option value="orders"><option value="payments"><option value="publishers"><option value="reviews"><option value="shipments"><option value="stock_levels"><option value="user_profiles"><option value="users"><option value="warehouses"><option value="wishlists"></datalist>
@@ -403,7 +403,7 @@ document.getElementById('png').onclick=()=>{const dark=document.documentElement.
  if(document.documentElement.dataset.theme==='dark'){c.setAttribute('style','--bg:#16181d;--ink:#e6e8ec;--mute:#98a1b0;--line:#9aa4b2;--bd:#4a5668;--row:#22262d;--foot:#2a2f37')}
  const w=+svg.getAttribute('width'),h=+svg.getAttribute('height'),img=new Image(),url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(c)],{type:'image/svg+xml'}));
  img.onload=()=>{const cv=document.createElement('canvas');cv.width=w*2;cv.height=h*2;const g=cv.getContext('2d');g.scale(2,2);g.drawImage(img,0,0);URL.revokeObjectURL(url);
-  cv.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download="DEMO"+'_'+currentId()+'.png';a.click()})};img.src=url};
+  cv.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download="Librairie_d_mo_"+'_'+currentId()+'.png';a.click()})};img.src=url};
 // redimensionnement : le point au centre de la vue reste au centre, le zoom est conserve
 let vw=main.clientWidth,vh=main.clientHeight;
 addEventListener('resize',()=>{tx+=(main.clientWidth-vw)/2;ty+=(main.clientHeight-vh)/2;vw=main.clientWidth;vh=main.clientHeight;apply()});
