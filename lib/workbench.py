@@ -35,7 +35,7 @@ def cmd_script(layout_path, out):
     box, hubs = boxes(lay), lay.get('hubs', [])
     src = f'''# -*- coding: utf-8 -*-
 # Genere par dbschema. A lancer dans MySQL Workbench : Scripting > Run Workbench Script File...
-# Place les tables par nom et dessine en "split" les liens vers : {", ".join(hubs) or "(aucune)"}.
+# Place les tables par nom et dessine en "split" les liens vers les tables de HUBS ci-dessous.
 # Ne cree, ne ferme et n'enregistre rien (File > Save pour garder). Annulation par Ctrl+Z non verifiee : essayer sur une copie.
 import grt
 BOX = {json.dumps({n: [round(v, 1) for v in b] for n, b in box.items()})}  # x, y, largeur, hauteur du layout dbschema
@@ -70,7 +70,7 @@ for d in model.diagrams:
 print('dbschema : %d tables placees, %d liens en split, absentes du diagramme : %s' % (placed, split, ', '.join(sorted(missing)) or 'aucune'))
 '''
     open(out, 'w', encoding='utf-8').write(src)
-    print(f'script Workbench : {out} ({len(box)} tables, hubs={hubs or "-"})')
+    print(f'script Workbench : {out} ({len(box)} tables, hubs={ascii(hubs) if hubs else "-"})')
 
 
 def own_value(x, struct, key):
@@ -90,8 +90,19 @@ def cmd_patch(layout_path, src, dst):
     box, hubs = boxes(lay), set(lay.get('hubs', []))
     h0 = hashlib.sha256(open(src, 'rb').read()).hexdigest()
     with zipfile.ZipFile(src) as zin:
-        x = zin.read('document.mwb.xml').decode('utf-8')
-        others = [(it, zin.read(it.filename)) for it in zin.infolist() if it.filename != 'document.mwb.xml']
+        budget = [500 * 2 ** 20]  # 500 Mo decompresses au total, compte en lisant (la taille declaree est falsifiable)
+
+        def read(member):
+            out = []
+            with zin.open(member) as f:
+                while chunk := f.read(1 << 20):
+                    budget[0] -= len(chunk)
+                    if budget[0] < 0:
+                        sys.exit('ECHEC : .mwb de plus de 500 Mo une fois decompresse : refus')
+                    out.append(chunk)
+            return b''.join(out)
+        x = read('document.mwb.xml').decode('utf-8')
+        others = [(it, read(it)) for it in zin.infolist() if it.filename != 'document.mwb.xml']
         doc_info = zin.getinfo('document.mwb.xml')
     if x.count('struct-name="workbench.physical.Layer"') > 1:
         sys.exit('ECHEC : le modele a plusieurs calques (layers) ; les positions y sont relatives au calque. Non gere : refus.')

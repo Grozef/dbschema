@@ -36,7 +36,7 @@ Prérequis :
 
 ```bash
 git clone https://github.com/Grozef/dbschema.git ~/.claude/skills/dbschema
-cd ~/.claude/skills/dbschema && npm ci
+cd ~/.claude/skills/dbschema && npm ci --ignore-scripts
 ```
 
 Variables d'environnement facultatives :
@@ -64,10 +64,16 @@ Options :
 
 ## Sécurité
 
+**`--laravel` exécute le code PHP du dépôt** (bootstrap, service providers, migrations) avec vos droits : ne l'utilisez que sur un dépôt de confiance. Le skill refuse sans `--trust-repo`. Le code reçoit un environnement réduit (sans mot de passe ni jeton de votre session), mais ce n'est pas une barrière : il tourne sous votre compte et peut lire ce que vous pouvez lire.
+
+**Les livrables décrivent votre base** : structure complète, commentaires, valeurs par défaut et ENUM, noms d'index et de contraintes. Relisez-les avant de les publier. Le SQL exporté ne contient que les tables : ni vues, ni triggers, ni routines, ni compteurs `AUTO_INCREMENT=N`. Un script `--sql` qui crée autre chose que des tables est refusé.
+
 `--sql` et `--laravel` exécutent du code fourni par l'utilisateur. Garde-fous :
-- **Base et utilisateur jetables.** Le script s'exécute dans une base `zz_dbschema_<horodatage>`, avec un utilisateur MySQL du même nom qui n'a de droits que sur cette base. Les deux sont supprimés à la fin, même en cas d'erreur.
+- **Base et utilisateur jetables.** Le script s'exécute dans une base `zz_dbschema_<horodatage>`, avec un utilisateur MySQL du même nom qui n'a de droits que sur cette base. Les deux sont supprimés à la fin, même en cas d'erreur ; si le processus est tué, au lancement suivant (après une heure).
 - **Filtre avant exécution.** Un premier filtre refuse, avec un message lisible : `USE`, `CREATE/DROP DATABASE`, les noms `base.table`, `SET GLOBAL`, les modes SQL qui changent la lecture des chaînes, et les commandes du client `mysql`. Le client tourne en `--binary-mode`.
 - **Laravel.** `DB_URL` est neutralisé. La configuration effective est lue avant `migrate`, et les migrations qui changent de connexion sont refusées.
+- **Identifiants.** Ils passent par un fichier d'options temporaire, jamais par la ligne de commande. Le `my.ini` du serveur est ignoré et `local-infile` est désactivé.
+- **Noms piégés.** Un nom de table ou de colonne qui contient un caractère de contrôle est refusé : il pourrait injecter du code dans le script Workbench généré.
 - **Relevé avant/après.** Les tables des autres bases sont relevées avant et après : un écart arrête tout.
 
 Limites : voir la section *Limites connues* de [`SKILL.md`](SKILL.md).
