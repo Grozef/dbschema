@@ -22,9 +22,13 @@ db = extract.PREFIX + 'sbx' + time.strftime('%H%M%S')
 try:
     before = victim_state()
     cred = extract.sandbox_open(db)
-    grants = extract.run("SHOW GRANTS FOR '%s'@'127.0.0.1'" % db).strip().splitlines()
-    ok('droits : USAGE global + ALL sur sa seule base', len(grants) == 2 and 'GRANT USAGE ON *.*' in grants[0]
-       and ('`%s`.*' % db.replace('_', '\\_')) in grants[1], grants)
+    hosts = extract.run("SELECT host FROM mysql.user WHERE user='%s'" % db).split()
+    ok('compte jetable : 127.0.0.1, localhost (+ hote vu par le serveur), aucun joker', {'127.0.0.1', 'localhost'} <= set(hosts)
+       and not any(c in h for h in hosts for c in '%_'), hosts)
+    for h in hosts:  # chaque hote : USAGE global + ALL sur sa seule base
+        grants = extract.run("SHOW GRANTS FOR '%s'@'%s'" % (db, h)).strip().splitlines()
+        ok('droits @%s : USAGE global + ALL sur sa seule base' % h, len(grants) == 2 and 'GRANT USAGE ON *.*' in grants[0]
+           and ('`%s`.*' % db.replace('_', '\\_')) in grants[1], grants)
     ok('ecriture dans sa base', extract.run('CREATE TABLE a (id INT); INSERT INTO a VALUES (1); SELECT COUNT(*) FROM a', db=db, cred=cred).strip() == '1')
     for name, sql in [('CREATE TABLE dans une autre base', 'CREATE TABLE `%s`.x (id INT)' % V),
                       ('INSERT dans une autre base', 'INSERT INTO `%s`.t VALUES (2)' % V),

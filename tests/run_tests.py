@@ -105,6 +105,45 @@ ok('--db : nom invalide refuse', code != 0 and 'nom de base refuse' in out, out.
 code, out = run([sys.executable, '-I', os.path.join(LIB, 'extract.py'), '--db', 'zz_dbschema_inexistante_xyz', '--out', os.path.join(tmp, 'x.json')])
 ok('--db : base inexistante refusee', code != 0 and 'inexistante' in out, out.strip()[-80:])
 
+# 2b. portabilite : binaires (Laragon/XAMPP/WAMP/MAMP) sur une arborescence factice, hote et port, valeurs par defaut MariaDB
+def exits(f, *a):
+    try:
+        return 'ok', f(*a)
+    except SystemExit as e:
+        return 'exit', str(e)
+fake = os.path.join(tmp, 'stacks')
+for d, n in (('xampp/mysql/bin', 'mysql'), ('wamp/bin/mariadb/mariadb11/bin', 'mariadb'), ('wamp/bin/mariadb/mariadb11/bin', 'mariadb-dump')):
+    os.makedirs(os.path.join(fake, d), exist_ok=True)
+    open(os.path.join(fake, d, n + ex.EXE), 'w').close()
+saved_env, saved_stacks = dict(os.environ), ex.STACKS
+try:
+    os.environ.pop('DBSCHEMA_MYSQL_BIN', None)
+    ex.STACKS = [os.path.join(fake, 'wamp', 'bin', 'mariadb', '*', 'bin')]
+    r = exits(ex.mysql_bin, 'mysqldump')
+    ok('binaires : MariaDB 11 seul -> mariadb-dump', r[0] == 'ok' and r[1].endswith('mariadb-dump' + ex.EXE), r)
+    ex.STACKS = [os.path.join(fake, 'xampp', 'mysql', 'bin'), os.path.join(fake, 'wamp', 'bin', 'mariadb', '*', 'bin')]
+    r = exits(ex.mysql_bin, 'mysql')
+    ok('binaires : deux installations -> refus', r[0] == 'exit' and 'plusieurs' in r[1], r)
+    os.environ['DBSCHEMA_MYSQL_BIN'] = os.path.join(fake, 'xampp', 'mysql', 'bin')
+    r = exits(ex.mysql_bin, 'mysql')
+    ok('binaires : DBSCHEMA_MYSQL_BIN prioritaire', r[0] == 'ok' and 'xampp' in r[1], r)
+    del os.environ['DBSCHEMA_MYSQL_BIN']
+    for h, p in (('db;rm -rf', '3306'), ('127.0.0.1', '99999'), ('127.0.0.1', '33a'), ('h\nost', '3306'),
+                 ('127.0.0.1', '٣٣٠٦'), ('héte', '3306'), ('a"b', '3306')):
+        os.environ.update(DBSCHEMA_MYSQL_HOST=h, DBSCHEMA_MYSQL_PORT=p)
+        r = exits(ex.conn)
+        ok('hote/port invalide refuse : %s:%s' % (ascii(h), ascii(p)), r[0] == 'exit' and 'invalides' in r[1], ascii(r))  # console cp1252
+finally:
+    ex.STACKS = saved_stacks
+    os.environ.clear(); os.environ.update(saved_env)
+for h in ('db.example.com', 'LOCALHOST', '127.0.0.2', '0'):
+    r = subprocess.run([sys.executable, '-I', os.path.join(LIB, 'extract.py'), '--sql', os.path.join(FIX, 'edge-cases.sql'), '--out',
+                        os.path.join(tmp, 'x.json')], capture_output=True, text=True, env={**os.environ, 'DBSCHEMA_MYSQL_HOST': h})
+    ok('--sql vers un hote non local refuse (avant toute connexion) : ' + h, r.returncode != 0 and 'serveur local seulement' in r.stderr,
+       r.stderr.strip()[-90:])
+md = {"'a''b'": "a'b", 'NULL': None, "'NULL'": 'NULL', 'current_timestamp()': 'current_timestamp()', '0': '0', None: None}
+ok('MariaDB : COLUMN_DEFAULT normalise', all(ex.maria_default(k) == v for k, v in md.items()), {k: ex.maria_default(k) for k in md})
+
 # 3. Schema de demonstration (librairie) : 19 tables, 31 FK, 6 domaines, controles OK sur toutes les vues
 cm = os.path.join(tmp, 'com_model.json')
 code, out = run([sys.executable, '-I', os.path.join(LIB, 'extract.py'), '--sql', os.path.join(FIX, 'demo.sql'),
