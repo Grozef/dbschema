@@ -150,7 +150,7 @@ python tests/compat_test.py <dossier_temp>   # Docker : MariaDB 11.4, MySQL 5.7,
 | `tests/unit/` | `unit` | filtre SQL, binaires et connexion, modèle et cardinalités sur des données injectées, `--cards`, Laravel, Workbench et `.mwb` |
 | `tests/functional/` | `functional` | extraction sur un vrai serveur, modèle identique quel que soit le serveur, aller-retour SQL, `--db` en lecture seule |
 | `tests/e2e/` | `e2e` | `dbschema.sh all` de bout en bout, PNG, script Workbench, `.mwb`, interface sous Playwright, débordements, mode sans navigateur |
-| `tests/perf/` | `perf` | schémas générés de 25, 100 et 250 tables, budgets de temps et de taille (`budgets.json`) |
+| `tests/perf/` | `perf` | schémas générés de 25, 100 et 250 tables, budgets de temps et de taille (`budgets.json`) bloquants en CI Linux ; ailleurs, mesures affichées sans budget |
 | `tests/security/` | `security` | utilisateur jetable contre une base témoin, constats des audits, fuzz du filtre (2 000 scripts), XSS dans le navigateur, arguments piégés |
 
 Sans serveur ou sans navigateur, les tests qui en dépendent sont sautés, et pytest le signale. En CI, `DBSCHEMA_REQUIRE_DB=1` et `DBSCHEMA_REQUIRE_BROWSER=1` en font des échecs. Les tests créent et suppriment des bases et des comptes `zz_dbschema_*` : à lancer sur un serveur de développement.
