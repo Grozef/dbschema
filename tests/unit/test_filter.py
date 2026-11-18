@@ -57,6 +57,10 @@ BAD = {
     'ENGINE en chaine + CONNECTION sans =': "CREATE TABLE t (id int) ENGINE='FEDERATED' CONNECTION 'mysql://root@127.0.0.1/prod/u';",
     'ENGINE entre guillemets doubles': 'CREATE TABLE t (id int) ENGINE="FEDERATED";',
     'ENGINE entre backticks': 'CREATE TABLE t (id int) ENGINE=`FEDERATED`;',
+    # refusees par MySQL 8.4 (1064 / 1286, verifie le 2026-11-18), MariaDB non verifie : refus au filtre quand meme
+    'ENGINE chaine avec jeu de caracteres': "CREATE TABLE t (id int) ENGINE=_utf8mb4'FEDERATED';",
+    'ENGINE chaine nationale': "CREATE TABLE t (id int) ENGINE=N'FEDERATED';",
+    'ENGINE backticks avec espace': 'CREATE TABLE t (id int) ENGINE=` FEDERATED`;',
     'ALTER vers CONNECT en chaine': "CREATE TABLE t (id int); ALTER TABLE t ENGINE='CONNECT';",
     'CONNECTION sans = sur InnoDB': "CREATE TABLE t (id int) ENGINE=InnoDB CONNECTION 'x';",
     '-- puis tabulation verticale': "CREATE TABLE t (a INT) --\x0b '\n; USE prod; -- '\n",
