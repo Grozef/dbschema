@@ -33,6 +33,8 @@ def test_budget(db, chrome, tmp_path, n):
     cross = {l.split(']')[0][1:]: int(l.split('croisements=')[1].split()[0]) for l in bout.splitlines() if 'croisements=' in l}
     m = RESULTS[str(n)] = {'extract_s': round(t1 - t0, 2), 'build_s': round(t2 - t1, 2), 'html_kb': round(html / 1024), 'crossings': cross,
                            'platform': sys.platform}
-    b = BUDGETS[str(n)]
+    if sys.platform not in BUDGETS:
+        pytest.skip('mesure seulement (pas de budget pour %s, voir budgets.json) : %s' % (sys.platform, m))
+    b = BUDGETS[sys.platform][str(n)]
     over = {k: (m[k], b[k]) for k in ('extract_s', 'build_s', 'html_kb') if m[k] > b[k]}
     assert not over, 'budget depasse (mesure, budget) : %s' % over

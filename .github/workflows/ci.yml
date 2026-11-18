@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, python: '3.9', node: '18' }
+          - { os: ubuntu-24.04, python: '3.9', node: '18' }  # ubuntu-latest = 26.04 : setup-python n'y a plus de 3.9
           - { os: ubuntu-latest, python: '3.13', node: '24' }
           - { os: windows-latest, python: '3.13', node: '24' }
           - { os: macos-latest, python: '3.13', node: '24' }
