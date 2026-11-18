@@ -89,3 +89,31 @@ def test_patch_refuse_plusieurs_calques(lay, tmp_path):
     write_mwb(str(src), ['a', 'b', 'c'], [], layers=2)
     with pytest.raises(SystemExit, match='plusieurs calques'):
         workbench.cmd_patch(str(lay), str(src), str(tmp_path / 'out.mwb'))
+
+
+def test_patch_refuse_modele_sans_table_du_schema(lay, tmp_path):
+    """Mauvais fichier --mwb : refus lisible, plus de ValueError (revue du 2026-11-18)."""
+    src = tmp_path / 'src.mwb'
+    write_mwb(str(src), ['autre1', 'autre2'], [])
+    with pytest.raises(SystemExit, match='aucune table du schema'):
+        workbench.cmd_patch(str(lay), str(src), str(tmp_path / 'out.mwb'))
+    assert not (tmp_path / 'out.mwb').exists()
+
+
+def test_patch_refuse_bombe_de_decompression(lay, tmp_path, monkeypatch):
+    src = tmp_path / 'src.mwb'
+    write_mwb(str(src), ['a', 'b', 'c'], [])
+    monkeypatch.setattr(workbench, 'MAX_UNZIPPED', 1000)  # document.mwb.xml du modele synthetique : plus de 1 000 octets
+    with pytest.raises(SystemExit, match='decompresse'):
+        workbench.cmd_patch(str(lay), str(src), str(tmp_path / 'out.mwb'))
+
+
+def test_patch_refuse_layout_qui_se_chevauche(tmp_path):
+    """Dernier filet : si le layout se chevauche deja, les positions mises a l'echelle se chevauchent aussi -> refus."""
+    p = tmp_path / 'lay.json'
+    p.write_text(json.dumps({'tables': {'a': {'x': 0, 'y': 0, 'w': 150, 'h': 100}, 'b': {'x': 50, 'y': 50, 'w': 150, 'h': 100}},
+                             'hubs': []}), encoding='utf-8')
+    src = tmp_path / 'src.mwb'
+    write_mwb(str(src), ['a', 'b'], [])
+    with pytest.raises(SystemExit, match='chevauchements'):
+        workbench.cmd_patch(str(p), str(src), str(tmp_path / 'out.mwb'))

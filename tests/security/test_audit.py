@@ -43,12 +43,13 @@ def test_vue_trigger_detectes_export_tables_seules(db, tmp_path):
         db.sandbox_close(sb)
 
 
-def test_script_qui_cree_une_vue_refuse_apres_execution(db, tmp_path):
-    """Le filtre refuse CREATE VIEW ; un contournement par commentaire executable est rattrape apres execution."""
+def test_vue_dans_un_commentaire_executable_refusee_par_le_filtre(db, tmp_path):
+    """CREATE VIEW cache dans /*!50001 ... */ : refuse AVANT execution par le filtre. Le refus APRES execution (filtre
+    contourne) est prouve par tests/functional/test_revue.py::test_refus_apres_execution_si_le_filtre_est_contourne."""
     p = tmp_path / 'v.sql'
     p.write_text('CREATE TABLE t (id INT);\n/*!50001 CREATE VIEW v AS SELECT id FROM t */;', encoding='utf-8')
     code, out = extract_cli('--sql', str(p), '--out', str(tmp_path / 'm.json'))
-    assert code != 0 and ('script refuse' in out or 'autre chose que des tables' in out)
+    assert code != 0 and 'script refuse' in out and 'CREATE VIEW' in out
 
 
 def test_orphelin_ancien_supprime(db):

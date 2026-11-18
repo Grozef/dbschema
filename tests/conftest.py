@@ -26,6 +26,11 @@ def run(cmd, env=None, cwd=None, timeout=900):
 
 
 def extract_cli(*args, env=None):
+    # DBSCHEMA_COV=1 (CI) : couverture mesuree aussi dans ce sous-processus, toujours en -I comme en production (dbschema.sh) ;
+    # la configuration passe par --rcfile, pas par l'environnement (que -I ignorerait)
+    if os.environ.get('DBSCHEMA_COV') == '1':
+        cov = [sys.executable, '-I', '-m', 'coverage', 'run', '--parallel-mode', '--rcfile=' + os.path.join(ROOT, '.coveragerc')]
+        return run(cov + [os.path.join(LIB, 'extract.py'), *args], env=env, cwd=ROOT)
     return run([sys.executable, '-I', os.path.join(LIB, 'extract.py'), *args], env=env)
 
 

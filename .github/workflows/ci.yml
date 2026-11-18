@@ -18,6 +18,7 @@ jobs:
   static:
     name: static
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -40,11 +41,12 @@ jobs:
   unit:
     name: unit (${{ matrix.os }}, py${{ matrix.python }}, node${{ matrix.node }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04, python: '3.9', node: '18' }  # ubuntu-latest = 26.04 : setup-python n'y a plus de 3.9
+          - { os: ubuntu-latest, python: '3.10', node: '18' }  # version minimale prise en charge
           - { os: ubuntu-latest, python: '3.13', node: '24' }
           - { os: windows-latest, python: '3.13', node: '24' }
           - { os: macos-latest, python: '3.13', node: '24' }
@@ -60,15 +62,21 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: python -m pip install pytest==8.4.2
+      - run: python -m pip install -r requirements-unit.txt
       - name: node:test (layout, controles, rendu)
         run: node --test tests/js/*.test.mjs
+      - name: couverture JS de lib/ (seuils)
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
+        run: >-
+          node --test --experimental-test-coverage --test-coverage-include='lib/**'
+          --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 tests/js/*.test.mjs
       - name: pytest -m unit
         run: python -m pytest -m unit -p no:cacheprovider --junitxml=junit-unit.xml
 
   db:
     name: db (${{ matrix.db }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -106,8 +114,12 @@ jobs:
           mysql --version; mysqldump --version; google-chrome --version
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: python -m pip install -r requirements-dev.txt
-      - name: pytest fonctionnel, e2e, securite
-        run: python -m pytest -m "functional or e2e or security" -p no:cacheprovider --basetemp="$RUNNER_TEMP/pt" --junitxml=junit-db.xml
+      - name: pytest (tout sauf perf) + couverture de lib/ (sous-processus compris)
+        env:
+          DBSCHEMA_COV: '1'
+        run: >-
+          python -m pytest -m "not perf" -p no:cacheprovider --basetemp="$RUNNER_TEMP/pt" --junitxml=junit-db.xml
+          --cov --cov-config=.coveragerc --cov-report=term-missing --cov-fail-under=90
       - name: livrables (PNG, HTML) et rapport
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -122,6 +134,7 @@ jobs:
   render:
     name: render (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -151,6 +164,7 @@ jobs:
   perf:
     name: perf
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       db:
         image: mysql:8.4
@@ -186,6 +200,7 @@ jobs:
   security:
     name: security
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -211,6 +226,7 @@ jobs:
     name: dependency-review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0

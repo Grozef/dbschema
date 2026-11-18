@@ -1,12 +1,20 @@
 // renderSvg / interactivePage : tout texte du schema est echappe, la page n'a ni ressource externe ni <script> refermable.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { layout } from '../../lib/layout.mjs';
 import { renderSvg } from '../../lib/svg.mjs';
 import { interactivePage, staticPage } from '../../lib/render.mjs';
 import { mini } from './helpers.mjs';
 
 const EVIL_T = '<img src=x onerror=alert(1)>', EVIL_C = '"><svg onload=alert(2)>', EVIL_S = '</script><script>alert(3)</script>';
+// contenu entre une balise ouvrante exacte et la fermeture qui suit (sans regex HTML : CodeQL js/bad-tag-filter)
+const between = (html, open, close = '</script>') => {
+  const a = html.indexOf(open);
+  assert.ok(a >= 0, 'balise absente : ' + open);
+  return html.slice(a + open.length, html.indexOf(close, a + open.length));
+};
 
 async function evil() {
   const m = mini({ [EVIL_T]: [EVIL_C], child: ['p_id'] }, [['child', 'p_id', EVIL_T, 'id']], { ['G<b>' + EVIL_S]: [EVIL_T] });
@@ -33,17 +41,33 @@ test('page interactive : CSP stricte, aucune ressource externe', async () => {
   assert.ok(!/\b(src|href)=["']?(https?:)?\/\//i.test(html), 'ressource externe');
 });
 
-test('page interactive : un seul <script>, jamais referme par une donnee', async () => {
+test("CSP : script autorise par son empreinte, pas de 'unsafe-inline' pour les scripts", async () => {
   const { m, lay } = await evil();
   const html = interactivePage(m, [{ id: 'all', label: 'Toutes', layout: lay }], { title: EVIL_S });
-  assert.equal((html.match(/<script/gi) || []).length, 1);
-  assert.equal((html.match(/<\/script/gi) || []).length, 1);
+  const csp = html.match(/Content-Security-Policy" content="([^"]+)"/)[1];
+  const scriptSrc = csp.split(';').map((d) => d.trim()).find((d) => d.startsWith('script-src'));
+  assert.ok(!scriptSrc.includes('unsafe-inline'), scriptSrc);
+  const code = between(html, '<script>');
+  const sha = 'sha256-' + createHash('sha256').update(code, 'utf8').digest('base64');
+  assert.equal(scriptSrc, `script-src '${sha}'`);
+  // le navigateur calcule l'empreinte APRES normalisation CRLF -> LF : le texte insere ne doit contenir aucun CR
+  assert.ok(!code.includes('\r'), 'CR dans le script insere : empreinte fausse dans le navigateur (clone Windows autocrlf)');
+  assert.equal(code, readFileSync(new URL('../../assets/viewer.js', import.meta.url), 'utf8').replace(/\r\n?/g, '\n'));
+});
+
+test('page interactive : 1 script executable + 1 bloc de donnees, jamais refermes par une donnee', async () => {
+  const { m, lay } = await evil();
+  const html = interactivePage(m, [{ id: 'all', label: 'Toutes', layout: lay }], { title: EVIL_S });
+  assert.equal((html.match(/<script/gi) || []).length, 2);
+  assert.equal((html.match(/<\/script/gi) || []).length, 2);
   assert.ok(!html.includes('alert(3)</script>'));
-  // les donnees embarquees se relisent a l'identique (JSON.parse dans la page)
-  const lit = html.match(/const D=JSON\.parse\((".*?")\);/s)[1];
-  const D = JSON.parse(JSON.parse(lit));
+  // les donnees embarquees se relisent a l'identique (JSON.parse du bloc application/json dans la page)
+  const raw = between(html, '<script type="application/json" id="dbschema-data">');
+  assert.ok(!raw.includes('<'));
+  const D = JSON.parse(raw);
   assert.ok(Object.hasOwn(D.tables, EVIL_T));
   assert.equal(D.tables[EVIL_T].comment, EVIL_S + ' javascript:alert(4)');
+  assert.equal(D.file, '_script_script_alert_3_script_'); // titre '</script><script>alert(3)</script>', [^\w.-]+ -> _
 });
 
 test('page statique (PNG) : meme echappement', async () => {

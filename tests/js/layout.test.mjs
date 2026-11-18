@@ -86,6 +86,35 @@ test('visibleColumns : mode cles garde PK, FK et colonnes referencees', () => {
   assert.equal(visibleColumns(t, 'names').length, 0);
 });
 
+for (const col of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+  for (const mode of ['all', 'names']) {
+    test(`colonne FK "${col}" (hub + auto-reference), mode ${mode} : controles OK (revue du 2026-11-18)`, async () => {
+      const tables = { h: [] }, rels = [];
+      for (let i = 0; i < 3; i++) { tables['t' + i] = [col]; rels.push(['t' + i, col, 'h', 'id']); }
+      tables.s = [col];
+      rels.push(['s', col, 's', 'id', '0..1']);
+      ok(await layout(JSON.parse(JSON.stringify(mini(tables, rels))), { mode, hub: 2 }));
+    });
+  }
+}
+
+test('ENUM tres long : type affiche tronque, carte de largeur bornee (revue du 2026-11-18)', async () => {
+  const m = mini({ t: ['etat'] });
+  m.tables.t.columns[1].type = 'enum(' + Array.from({ length: 40 }, (_, i) => `'valeur_numero_${i}'`).join(',') + ')';
+  const st = shortType(m.tables.t.columns[1]);
+  assert.equal(st.length, 40);
+  assert.ok(st.endsWith('…'));
+  const lay = await layout(m);
+  assert.ok(lay.tables.t.w < 450, lay.tables.t.w);
+  ok(lay);
+});
+
+test("shortType : coupe par caracteres, jamais au milieu d'un emoji", () => {
+  const st = shortType({ type: "enum('" + '😀'.repeat(60) + "')" });
+  assert.equal([...st].length, 40);
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(st), 'paire de substitution coupee');
+});
+
 test('shortType : majuscules, sans UNSIGNED', () => {
   assert.equal(shortType({ type: 'int unsigned' }), 'INT');
   assert.equal(shortType({ type: 'varchar(20)' }), 'VARCHAR(20)');

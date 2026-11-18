@@ -18,7 +18,8 @@ def test_aucune_execution_a_l_ouverture(page, xss_html):
     page.goto(xss_html.as_uri())
     page.wait_for_timeout(500)
     assert page.dialogs == []
-    assert page.evaluate("document.querySelectorAll('script').length") == 1
+    # 1 script executable (autorise par son empreinte dans la CSP) + 1 bloc de donnees JSON, rien d'autre
+    assert page.evaluate("[...document.querySelectorAll('script')].map(s => s.type || 'js')") == ['application/json', 'js']
     assert page.evaluate("document.querySelectorAll('img[onerror], svg[onload], [onerror], [onload]').length") == 0
     assert page.errors == []
 

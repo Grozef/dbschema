@@ -1,0 +1,3 @@
+# Tests sans base ni navigateur (job CI unit, 3 OS, Python 3.10+). Developpement seulement : le skill n'a besoin que de la stdlib.
+pytest==9.1.1
+pytest-timeout==2.4.0
