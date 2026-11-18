@@ -57,10 +57,13 @@ try:
         if not version:
             continue
         ready[image] = name
-        r = subprocess.run([sys.executable, '-I', os.path.join(HERE, 'run_tests.py'), os.path.join(tmp, name)], capture_output=True,
-                           text=True, encoding='utf-8', errors='replace', env=env_for(port))
-        bad = [l for l in r.stdout.splitlines() if l.startswith('[ECHEC]')]
-        ok(image + ' : suite complete', r.returncode == 0, ' | '.join(bad)[:1500] or '%d verifications' % r.stdout.count('[OK]'))
+        # suite pytest hors perf, base et navigateur exiges (aucun saut silencieux)
+        r = subprocess.run([sys.executable, '-m', 'pytest', '-m', 'not perf', '-q', '-p', 'no:cacheprovider',
+                            '--basetemp', os.path.join(tmp, name)], capture_output=True, text=True, encoding='utf-8', errors='replace',
+                           cwd=SKILL, env={**env_for(port), 'DBSCHEMA_REQUIRE_DB': '1', 'DBSCHEMA_REQUIRE_BROWSER': '1'})
+        last = (r.stdout.strip().splitlines() or [''])[-1]
+        bad = [l for l in r.stdout.splitlines() if l.startswith(('FAILED', 'ERROR'))]
+        ok(image + ' : suite complete', r.returncode == 0, ' | '.join(bad)[:1500] or last)
 
     # Linux : le conteneur partage le reseau de MariaDB (127.0.0.1:3306 = MariaDB), skill monte en lecture seule
     maria = ready.get('mariadb:11.4')

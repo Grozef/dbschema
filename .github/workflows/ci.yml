@@ -1,0 +1,216 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions epinglees par SHA de commit (version en commentaire), publiees depuis plus de 2 semaines au moment du choix.
+jobs:
+  static:
+    name: static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Python compile
+        run: python -m py_compile lib/*.py tests/*.py tests/*/*.py
+      - name: JS syntaxe
+        run: for f in lib/*.mjs tests/js/*.mjs; do node --check "$f"; done
+      - name: bash -n
+        run: bash -n dbschema.sh
+      - name: scripts shell en LF dans le depot
+        run: |
+          bad=$(git ls-files --eol '*.sh' | grep -v '^i/lf' || true)
+          [ -z "$bad" ] || { echo "$bad"; exit 1; }
+
+  unit:
+    name: unit (${{ matrix.os }}, py${{ matrix.python }}, node${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, python: '3.9', node: '18' }
+          - { os: ubuntu-latest, python: '3.13', node: '24' }
+          - { os: windows-latest, python: '3.13', node: '24' }
+          - { os: macos-latest, python: '3.13', node: '24' }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: python -m pip install pytest==8.4.2
+      - name: node:test (layout, controles, rendu)
+        run: node --test tests/js/*.test.mjs
+      - name: pytest -m unit
+        run: python -m pytest -m unit -p no:cacheprovider --junitxml=junit-unit.xml
+
+  db:
+    name: db (${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { db: 'mysql:8.4', health: 'mysqladmin ping -h 127.0.0.1 -pci-root-pw', client: mysql }
+          - { db: 'mysql:5.7', health: 'mysqladmin ping -h 127.0.0.1 -pci-root-pw', client: mysql }
+          - { db: 'mariadb:11.4', health: 'healthcheck.sh --connect --innodb_initialized', client: mariadb }
+    services:
+      db:
+        image: ${{ matrix.db }}
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-pw
+          MARIADB_ROOT_PASSWORD: ci-root-pw
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "${{ matrix.health }}" --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      DBSCHEMA_MYSQL_PASSWORD: ci-root-pw
+      DBSCHEMA_REQUIRE_DB: '1'
+      DBSCHEMA_REQUIRE_BROWSER: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: client MariaDB (mariadb, mariadb-dump)
+        if: matrix.client == 'mariadb'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client
+      - name: outils presents
+        run: |
+          which mysql mysqldump mariadb mariadb-dump google-chrome || true
+          mysql --version; mysqldump --version; google-chrome --version
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: python -m pip install -r requirements-dev.txt
+      - name: pytest fonctionnel, e2e, securite
+        run: python -m pytest -m "functional or e2e or security" -p no:cacheprovider --basetemp="$RUNNER_TEMP/pt" --junitxml=junit-db.xml
+      - name: livrables (PNG, HTML) et rapport
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: livrables-${{ strategy.job-index }}
+          path: |
+            ${{ runner.temp }}/pt/demo0/out/DEMO.*
+            ${{ runner.temp }}/pt/xss0/XSS.*
+            junit-db.xml
+          if-no-files-found: warn
+
+  render:
+    name: render (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: HTML + PNG depuis le modele de demonstration (sans base)
+        run: |
+          node lib/build.mjs tests/fixtures/demo.model.json out DEMO --frames | tee build.log
+          grep -q 'largeurs mesurees dans Chrome' build.log
+          grep -q 'debordements mesures dans Chrome (5 vues) : 0 -> OK' build.log
+          test "$(grep -c -- '-> OK' build.log)" -ge 6
+          test -s out/DEMO.png && test -s out/DEMO.html
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: render-${{ matrix.os }}
+          path: out/DEMO.*
+
+  perf:
+    name: perf
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-pw
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pci-root-pw" --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      DBSCHEMA_MYSQL_PASSWORD: ci-root-pw
+      DBSCHEMA_REQUIRE_DB: '1'
+      DBSCHEMA_REQUIRE_BROWSER: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: python -m pip install -r requirements-dev.txt
+      - name: budgets (tests/perf/budgets.json)
+        run: python -m pytest -m perf -p no:cacheprovider -s
+        env:
+          DBSCHEMA_PERF_OUT: ${{ runner.temp }}/perf.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: perf
+          path: ${{ runner.temp }}/perf.json
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Bandit (lib/) ; B404/B603/B607 = appels de mysql, mysqldump, php, node, inherents a l'outil
+        run: |
+          python -m pip install bandit==1.8.6
+          python -m bandit -r lib -s B404,B603,B607
+      - name: npm audit (dependances livrees)
+        run: npm audit --omit=dev --audit-level=low
+      - name: secrets dans l'historique (gitleaks)
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-review:
+    name: dependency-review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0

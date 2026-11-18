@@ -107,8 +107,14 @@ def maria_default(d):
     return d
 
 
-DBNAME = re.compile(r'^[\w$-]{1,64}$')
+DBNAME = re.compile(r'^[\w$-]{1,64}\Z')  # \Z et non $ : $ accepte un \n final
 CTRL = re.compile('[\x00-\x1f\x7f\x85\u2028\u2029]')
+
+
+def jetable(db):
+    """Garde-fou des ecritures : base et compte zz_dbschema_* seulement. Pas d'assert (retire par python -O)."""
+    if not (db.startswith(PREFIX) and DBNAME.match(db)):
+        sys.exit('garde-fou : %r n\'est pas une base jetable %s*' % (db, PREFIX))
 
 
 def rows(select, db):
@@ -184,7 +190,7 @@ ALLOWED = re.compile(r'(CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE|CREATE\s+(UNIQ
 ID = r'[\w$\u0080-￿]'
 # nom qualifie base.table : identifiant (avec au moins un caractere non numerique, pour ne pas prendre 1.5) ou `...` ou "..."
 QUALIFIED = re.compile(r'(`[^`]*`|""|(?<!%s)%s*[^\W\d]%s*)\s*\.\s*(`|"|%s)' % (ID, ID, ID, ID))
-TOKENS = re.compile(r"""'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`]|``)*`|/\*!\d*(.*?)\*/|/\*.*?\*/|(?:--[ \t\r\n]|#)[^\n]*""", re.S)
+TOKENS = re.compile(r"""'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`]|``)*`|/\*M?!\d*(.*?)\*/|/\*.*?\*/|(?:--[ \t\r\n]|#)[^\n]*""", re.S)
 SET_BAD = re.compile(r'\bSET\s+(GLOBAL|PERSIST|PERSIST_ONLY|PASSWORD|ROLE|DEFAULT\s+ROLE|RESOURCE\s+GROUP)\b|@@(GLOBAL|PERSIST)', re.I)
 # modes qui changent la lecture des chaines et des guillemets : cherches dans le texte BRUT (la valeur est une chaine)
 MODES_BAD = re.compile(r'\b(ANSI_QUOTES|NO_BACKSLASH_ESCAPES)\b|sql_mode\s*=[^;]*\bANSI\b|\b(big5|cp932|gbk|gb18030|sjis)\b', re.I)
@@ -200,8 +206,16 @@ def clean_sql(sql):
             return '""'
         if t[0] == '`':
             return t
-        if t.startswith('/*!'):
-            return ' ' + clean_sql(m.group(1)) + ' '
+        if t.startswith(('/*!', '/*M!')):  # /*M! : commentaire executable de MariaDB
+            # MySQL accepte un commentaire IMBRIQUE dans un commentaire executable (/*! SET /**/ GLOBAL x=1 */ s'execute en
+            # entier, verifie sur 8.4) : le contenu ne s'arrete pas au 1er */. Lecture ambigue -> refus (trouve par le fuzz).
+            # Idem pour une chaine ouverte : le serveur lit la chaine, donc un */ qu'elle contient ne ferme pas le commentaire.
+            body = m.group(1)
+            if t.startswith('/*M!') and re.fullmatch(r'\s*\\-\s*enable the sandbox mode\s*', body):
+                return ' '  # 1re ligne de mariadb-dump : passe le client en mode restreint (inoffensif)
+            if '/*' in body or any(body.count(q) % 2 for q in '\'"`'):
+                sys.exit('script refuse : commentaire executable ambigu (commentaire imbrique ou chaine ouverte) : ' + t[:60])
+            return ' ' + clean_sql(body) + ' '
         return ' '
     return TOKENS.sub(repl, sql)
 
@@ -244,7 +258,7 @@ def sandbox_hosts():
 def sandbox_open(db):
     """Base jetable + utilisateur jetable du meme nom, qui n'a de droits QUE sur cette base (ni FILE, ni SUPER, ni autre base).
     C'est la frontiere de droits ; le filtre check_script n'est qu'un premier refus lisible."""
-    assert db.startswith(PREFIX) and DBNAME.match(db)
+    jetable(db)
     pw = 'Zz9' + secrets.token_urlsafe(18)
     esc_db = db.replace('_', '\\_')  # GRANT : _ est un joker dans un nom de base
     run('CREATE DATABASE `%s` CHARACTER SET utf8mb4' % db)
@@ -255,10 +269,11 @@ def sandbox_open(db):
 
 
 def sandbox_close(db):
-    assert db.startswith(PREFIX) and DBNAME.match(db)
+    jetable(db)
     errs = []
     try:  # tous les hotes du compte, tels qu'enregistres
-        hosts = [h for h in run("SELECT host FROM mysql.user WHERE user='%s'" % db).splitlines() if HOST.fullmatch(h)]  # \r\n sous Windows
+        q = "SELECT host FROM mysql.user WHERE user='%s'" % db  # nosec B608 : db valide par jetable()
+        hosts = [h for h in run(q).splitlines() if HOST.fullmatch(h)]  # \r\n sous Windows
     except RuntimeError as e:
         errs.append(str(e))
         hosts = ['127.0.0.1', 'localhost']
@@ -288,8 +303,9 @@ def cleanup_stale(max_age=3600):
 
 def non_tables(db):
     """Vues, routines, evenements, triggers de la base jetable : refuses apres execution (le filtre peut etre contourne)."""
-    assert DBNAME.match(db)
-    out = run("SELECT CONCAT(kind,' ',name) FROM ("
+    if not DBNAME.match(db):  # appele aussi par dump() pour --db (base de l'utilisateur) : nom valide, pas forcement jetable
+        sys.exit('nom de base refuse : %r' % db)
+    out = run("SELECT CONCAT(kind,' ',name) FROM ("  # nosec B608 : db valide par DBNAME (lettres, chiffres, _ $ -)
               "SELECT 'vue' kind, TABLE_NAME name FROM information_schema.VIEWS WHERE TABLE_SCHEMA='%s' UNION ALL "
               "SELECT 'routine', ROUTINE_NAME FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA='%s' UNION ALL "
               "SELECT 'evenement', EVENT_NAME FROM information_schema.EVENTS WHERE EVENT_SCHEMA='%s' UNION ALL "
@@ -301,18 +317,22 @@ def snapshot():
     """Tables de toutes les bases hors zz_dbschema_ (creation, suppression, derniere modification) : detection d'une ecriture
     hors base jetable. Ne voit ni les changements de droits ni les variables serveur : ceux-la sont refuses en amont."""
     fresh = 'SET SESSION information_schema_stats_expiry=0; ' if server()[0] == 'mysql' and server()[1] >= (8, 0) else ''  # cache MySQL 8 seulement
-    out = run(fresh + "SELECT CONCAT(TABLE_SCHEMA,'.',TABLE_NAME,'|',IFNULL(CREATE_TIME,''),'|',IFNULL(UPDATE_TIME,'')) FROM information_schema.TABLES "
+    out = run(fresh + "SELECT CONCAT(TABLE_SCHEMA,"  # nosec B608 : texte fixe, aucune donnee interpolee
+              "'.',TABLE_NAME,'|',IFNULL(CREATE_TIME,''),'|',IFNULL(UPDATE_TIME,'')) FROM information_schema.TABLES "
               "WHERE TABLE_SCHEMA NOT LIKE 'zz\\_dbschema\\_%' AND TABLE_SCHEMA NOT IN "
               "('information_schema','performance_schema','mysql','sys')")
     return set(out.split('\n')) - {''}
 
 
-def dump_client(exe):
-    """('mariadb' | 'mysql', version majeure) du mysqldump. 5.7 : 'Ver 10.13 Distrib 5.7.x' ; 8+ : 'Ver 8.4.3' ;
+def dump_version(out, exe):
+    """('mariadb' | 'mysql', version majeure) d'apres la sortie --version. 5.7 : 'Ver 10.13 Distrib 5.7.x' ; 8+ : 'Ver 8.4.3' ;
     MariaDB : '... Distrib 10.6.x-MariaDB' ou 'mariadb-dump from 11.4.4-MariaDB'."""
-    out = subprocess.run([exe, '--no-defaults', '--version'], capture_output=True, text=True).stdout
     m = re.search(r'Distrib (\d+)', out) or re.search(r'(?:Ver|from) (\d+)', out)
     return ('mariadb' if 'mariadb' in (out + os.path.basename(exe)).lower() else 'mysql', int(m.group(1)) if m else 0)
+
+
+def dump_client(exe):
+    return dump_version(subprocess.run([exe, '--no-defaults', '--version'], capture_output=True, text=True).stdout, exe)
 
 
 def dump(db, path):
@@ -357,7 +377,7 @@ def foreign_connections(repo):
 
 def laravel_migrate(repo, db, cred):
     """migrate vers `db` uniquement. Toute incertitude sur la base cible = arret."""
-    assert db.startswith(PREFIX)
+    jetable(db)
     if not os.path.exists(os.path.join(repo, 'artisan')):
         sys.exit('pas de fichier artisan dans ' + repo)
     if os.path.exists(os.path.join(repo, 'bootstrap', 'cache', 'config.php')):
@@ -444,7 +464,7 @@ def main():
             sys.exit('--sql et --laravel creent une base et un compte jetables : serveur local seulement (DBSCHEMA_MYSQL_HOST=%s). '
                      'Pour un serveur distant : --db, en lecture seule.' % conn()[0])
         db = PREFIX + time.strftime('%Y%m%d%H%M%S') + secrets.token_hex(2)
-        assert db.startswith(PREFIX)
+        jetable(db)
         script = open(a.sql, 'rb').read() if a.sql else None  # lu UNE fois : le texte filtre est celui execute
         if a.sql:
             check_script(script.decode('utf-8', errors='replace'))
