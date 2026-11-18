@@ -92,10 +92,10 @@ def run(sql, db=None, stdin=None, binary=False, cred=None):
 
 @functools.lru_cache(None)
 def server():
-    """('mariadb' | 'mysql', (majeure, mineure)) lu dans VERSION()."""
-    v = run('SELECT VERSION()').strip()
+    """('mariadb' | 'mysql', (majeure, mineure), noms sensibles a la casse ?) : VERSION() et @@lower_case_table_names."""
+    v, lctn = (run('SELECT VERSION(), @@lower_case_table_names').strip().split('\t') + ['1'])[:2]
     m = re.match(r'(\d+)\.(\d+)', v)
-    return ('mariadb' if 'mariadb' in v.lower() else 'mysql', (int(m.group(1)), int(m.group(2))) if m else (0, 0))
+    return ('mariadb' if 'mariadb' in v.lower() else 'mysql', (int(m.group(1)), int(m.group(2))) if m else (0, 0), lctn.strip() == '0')
 
 
 def maria_default(d):
@@ -166,10 +166,17 @@ def read_model(db):
                         c['unique'] = True
     fks = {}
     for k in kcu:
-        if k['ref_schema'].lower() != db.lower():  # FK vers une autre base : rien a dessiner ici (sinon confondue avec une table homonyme)
+        # FK vers une autre base : rien a dessiner ici. Serveur sensible a la casse (Linux, lower_case_table_names=0) : « Shop »
+        # et « shop » sont deux bases (verifie sur MySQL 8.4 : la FK passait pour interne, vers une table absente -> crash ELK).
+        # Serveur insensible (Windows : 1 ; macOS : 2, ou InnoDB range les noms references en minuscules) : la table referencee est
+        # retrouvee sans tenir compte de la casse et prend le nom du modele (sinon une FK interne passait pour externe).
+        sensitive = server()[2]
+        same = k['ref_schema'] == db if sensitive else k['ref_schema'].lower() == db.lower()
+        to = k['ref_table'] if sensitive else next((t for t in model['tables'] if t.lower() == k['ref_table'].lower()), None)
+        if not same or to not in model['tables']:
             model['external_fks'].append('%s.%s -> %s.%s' % (k['table'], k['column'], k['ref_schema'], k['ref_table']))
             continue
-        f = fks.setdefault((k['table'], k['name']), {'name': k['name'], 'from': k['table'], 'to': k['ref_table'],
+        f = fks.setdefault((k['table'], k['name']), {'name': k['name'], 'from': k['table'], 'to': to,
                                                      'columns': [], 'ref_columns': [], 'on_update': k['on_update'], 'on_delete': k['on_delete']})
         f['columns'].append(k['column']); f['ref_columns'].append(k['ref_column'])
     for (t, _), f in fks.items():
@@ -186,11 +193,22 @@ def read_model(db):
 
 
 ALLOWED = re.compile(r'(CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE|CREATE\s+(UNIQUE\s+|FULLTEXT\s+|SPATIAL\s+)?INDEX|SET\s|'
-                     r'INSERT\s+INTO|LOCK\s+TABLES|UNLOCK\s+TABLES)', re.I)
+                     r'INSERT\s+INTO|LOCK\s+TABLES|UNLOCK\s+TABLES|START\s+TRANSACTION\b|'
+                     # seuls : BEGIN NOT ATOMIC (MariaDB) ouvrirait un bloc compose qui execute n'importe quoi
+                     r'(BEGIN|COMMIT|ROLLBACK)(\s+WORK)?\s*\Z)', re.I)
+# tables qui lisent ou ecrivent HORS de la base jetable : moteurs relais (autre serveur, fichiers), chemins de stockage.
+# Teste sur le texte NETTOYE (chaines -> '' ou "") : un moteur ecrit en chaine (ENGINE='FEDERATED') ou entre backticks est
+# refuse d'office ; CONNECTION refuse avec ou sans = (grammaire : CONNECTION [=] 'texte'). Releve par la relecture du 2026-11-18.
+# (?<![@.]) : @engine, @connection (variables) et t.engine ne sont pas des options de table
+STORAGE_BAD = re.compile(r"(?<![@.])\bENGINE\s*=?\s*(`?(FEDERATED|FEDERATEDX|CONNECT|SPIDER|S3|OQGRAPH)\b|''|\"\")|"
+                         r"(?<![@.])\bCONNECTION\s*(=|''|\"\")|\b(DATA|INDEX)\s+DIRECTORY\b|\bFILE_NAME\s*=", re.I)
 ID = r'[\w$\u0080-￿]'
 # nom qualifie base.table : identifiant (avec au moins un caractere non numerique, pour ne pas prendre 1.5) ou `...` ou "..."
 QUALIFIED = re.compile(r'(`[^`]*`|""|(?<!%s)%s*[^\W\d]%s*)\s*\.\s*(`|"|%s)' % (ID, ID, ID, ID))
-TOKENS = re.compile(r"""'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`]|``)*`|/\*M?!\d*(.*?)\*/|/\*.*?\*/|(?:--[ \t\r\n]|#)[^\n]*""", re.S)
+TOKENS = re.compile(r"""'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`]|``)*`|/\*M?!\d*(.*?)\*/|/\*.*?\*/|(?:--(?=[\x00-\x20]|\Z)|#)[^\n]*""", re.S)
+# -- suivi d'un blanc OU de tout caractere de controle (\v, \f, \x01... : MySQL les traite comme le blanc requis) ou de la fin :
+# le caractere est REGARDE, pas consomme. Consomme, un "--" en fin de ligne avalait la ligne suivante (vue comme commentaire
+# par le filtre, executee par MySQL : "--\nUSE prod;" passait le filtre ; trouve le 2026-11-18, \v et \f par la relecture)
 SET_BAD = re.compile(r'\bSET\s+(GLOBAL|PERSIST|PERSIST_ONLY|PASSWORD|ROLE|DEFAULT\s+ROLE|RESOURCE\s+GROUP)\b|@@(GLOBAL|PERSIST)', re.I)
 # modes qui changent la lecture des chaines et des guillemets : cherches dans le texte BRUT (la valeur est une chaine)
 MODES_BAD = re.compile(r'\b(ANSI_QUOTES|NO_BACKSLASH_ESCAPES)\b|sql_mode\s*=[^;]*\bANSI\b|\b(big5|cp932|gbk|gb18030|sjis)\b', re.I)
@@ -238,6 +256,10 @@ def check_script(sql):
             bad.append('instruction non autorisee : ' + st[:60])
         elif SET_BAD.search(st):
             bad.append('SET refuse : ' + st[:60])
+        elif STORAGE_BAD.search(st):
+            bad.append('stockage hors de la base (moteur relais, CONNECTION, DATA/INDEX DIRECTORY ; une colonne nommee engine ou '
+                       'connection affectee par = est aussi refusee : la renommer ou l\'ecrire entre backticks) : '
+                       + STORAGE_BAD.search(st).group(0)[:40])
         elif QUALIFIED.search(st_q):
             bad.append('nom prefixe par une base : ' + QUALIFIED.search(st_q).group(0) + ' dans ' + st[:50])
     if bad:
@@ -302,26 +324,34 @@ def cleanup_stale(max_age=3600):
 
 
 def non_tables(db):
-    """Vues, routines, evenements, triggers de la base jetable : refuses apres execution (le filtre peut etre contourne)."""
-    if not DBNAME.match(db):  # appele aussi par dump() pour --db (base de l'utilisateur) : nom valide, pas forcement jetable
-        sys.exit('nom de base refuse : %r' % db)
-    out = run("SELECT CONCAT(kind,' ',name) FROM ("  # nosec B608 : db valide par DBNAME (lettres, chiffres, _ $ -)
-              "SELECT 'vue' kind, TABLE_NAME name FROM information_schema.VIEWS WHERE TABLE_SCHEMA='%s' UNION ALL "
-              "SELECT 'routine', ROUTINE_NAME FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA='%s' UNION ALL "
-              "SELECT 'evenement', EVENT_NAME FROM information_schema.EVENTS WHERE EVENT_SCHEMA='%s' UNION ALL "
-              "SELECT 'trigger', TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA='%s') x" % ((db,) * 4))
-    return [x.strip() for x in out.split('\n') if x.strip()]
+    """Vues, routines, evenements, triggers : ['vue <nom>', ...]. Lus en JSON : un nom avec retour a la ligne reste entier
+    (en texte brut il etait coupe, la vue echappait a l'exclusion de dump()). Appele aussi pour --db : nom valide par rows()."""
+    return ['%s %s' % (x[0], x[1]) for x in rows(  # nosec B608 : {DB} valide par DBNAME dans rows()
+        "SELECT JSON_ARRAY(kind, name) FROM ("
+        "SELECT 'vue' kind, TABLE_NAME name FROM information_schema.VIEWS WHERE TABLE_SCHEMA='{DB}' UNION ALL "
+        "SELECT 'routine', ROUTINE_NAME FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA='{DB}' UNION ALL "
+        "SELECT 'evenement', EVENT_NAME FROM information_schema.EVENTS WHERE EVENT_SCHEMA='{DB}' UNION ALL "
+        "SELECT 'trigger', TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA='{DB}') x", db)]
 
 
 def snapshot():
     """Tables de toutes les bases hors zz_dbschema_ (creation, suppression, derniere modification) : detection d'une ecriture
     hors base jetable. Ne voit ni les changements de droits ni les variables serveur : ceux-la sont refuses en amont."""
     fresh = 'SET SESSION information_schema_stats_expiry=0; ' if server()[0] == 'mysql' and server()[1] >= (8, 0) else ''  # cache MySQL 8 seulement
-    out = run(fresh + "SELECT CONCAT(TABLE_SCHEMA,"  # nosec B608 : texte fixe, aucune donnee interpolee
-              "'.',TABLE_NAME,'|',IFNULL(CREATE_TIME,''),'|',IFNULL(UPDATE_TIME,'')) FROM information_schema.TABLES "
+    out = run(fresh + "SELECT JSON_ARRAY(CONCAT(TABLE_SCHEMA,"  # nosec B608 : texte fixe, aucune donnee interpolee
+              "'.',TABLE_NAME),IFNULL(CREATE_TIME,''),IFNULL(UPDATE_TIME,'')) FROM information_schema.TABLES "
               "WHERE TABLE_SCHEMA NOT LIKE 'zz\\_dbschema\\_%' AND TABLE_SCHEMA NOT IN "
               "('information_schema','performance_schema','mysql','sys')")
-    return set(out.split('\n')) - {''}
+    return {t: (c, u) for t, c, u in (json.loads(x) for x in out.split('\n') if x.strip())}
+
+
+def snapshot_diff(before, after):
+    """(structure, contenu) : tables creees, supprimees ou recreees (CREATE_TIME) = ecart bloquant ; UPDATE_TIME seul =
+    ecriture de donnees, souvent une autre application du poste (avertissement, pas d'echec)."""
+    struct = sorted(['+ ' + t for t in after.keys() - before.keys()] + ['- ' + t for t in before.keys() - after.keys()]
+                    + ['~ ' + t for t in before.keys() & after.keys() if before[t][0] != after[t][0]])
+    data = sorted(t for t in before.keys() & after.keys() if before[t][0] == after[t][0] and before[t][1] != after[t][1])
+    return struct, data
 
 
 def dump_version(out, exe):
@@ -337,9 +367,14 @@ def dump_client(exe):
 
 def dump(db, path):
     # vues exclues (tables seules) ; leurs noms passent par le fichier d'options, en UTF-8
-    views = [x.split(' ', 1)[1].strip() for x in non_tables(db) if x.startswith('vue ')]
-    ign = ['[mysqldump]'] + ['ignore-table="%s.%s"' % (db, v.replace('\\', '\\\\').replace('"', '\\"')) for v in views]
-    opts = ['--no-data', '--skip-comments', '--skip-add-drop-table', '--skip-triggers']
+    views = [x.split(' ', 1)[1] for x in non_tables(db) if x.startswith('vue ')]
+    bad = [repr(v) for v in views if CTRL.search(v)]
+    if bad:  # une vue que l'on ne peut pas nommer dans ignore-table finirait dans le SQL exporte
+        sys.exit('noms de vues refuses (caracteres de controle) : ' + ', '.join(bad[:10]))
+    ign =['[mysqldump]'] + ['ignore-table="%s.%s"' % (db, v.replace('\\', '\\\\').replace('"', '\\"')) for v in views]
+    # --skip-lock-tables : ni droit LOCK TABLES ni verrou ; --no-tablespaces : pas de droit PROCESS (MySQL 8.0.21+) -> un compte
+    # en SELECT seul suffit pour --db (serveur distant)
+    opts = ['--no-data', '--skip-comments', '--skip-add-drop-table', '--skip-triggers', '--skip-lock-tables', '--no-tablespaces']
     flavor, major = dump_client(mysql_bin('mysqldump'))
     if flavor == 'mysql':  # options inconnues du mysqldump de MariaDB
         opts.append('--set-gtid-purged=OFF')
@@ -466,6 +501,8 @@ def main():
         db = PREFIX + time.strftime('%Y%m%d%H%M%S') + secrets.token_hex(2)
         jetable(db)
         script = open(a.sql, 'rb').read() if a.sql else None  # lu UNE fois : le texte filtre est celui execute
+        if script and script.startswith(b'\xef\xbb\xbf'):
+            script = script[3:]  # BOM UTF-8 (Bloc-notes, exports Windows) : retire du texte filtre ET du texte execute
         if a.sql:
             check_script(script.decode('utf-8', errors='replace'))
         cleanup_stale()
@@ -478,8 +515,12 @@ def main():
             else:
                 laravel_migrate(os.path.abspath(a.laravel), db, cred)
                 if not a.keep_framework:
-                    for t in FRAMEWORK:
-                        run('DROP TABLE IF EXISTS `%s`' % t, db=db)
+                    dropped = sorted(FRAMEWORK & set(run('SHOW TABLES', db=db).split()))
+                    for t in dropped:
+                        run('DROP TABLE `%s`' % t, db=db)
+                    if dropped:  # par leur NOM : une table metier homonyme (sessions, jobs...) part aussi -> le dire
+                        print('tables du framework retirees (--keep-framework pour les garder) : ' + ', '.join(dropped),
+                              file=sys.stderr)
             extra = non_tables(db)
             if extra:
                 sys.exit('le script a cree autre chose que des tables (refuse : vues, routines, evenements, triggers) : '
@@ -491,11 +532,16 @@ def main():
                 dump(db, a.sql_out)
         finally:
             sandbox_close(db)
-            after = snapshot()
-            if after != before:
-                print('ATTENTION : des tables HORS base jetable ont change pendant l\'extraction :', file=sys.stderr)
-                for x in sorted(after ^ before)[:20]:
-                    print('  ' + ('+ ' if x in after else '- ') + x, file=sys.stderr)
+            struct, data = snapshot_diff(before, snapshot())
+            if data:
+                print('ATTENTION : donnees modifiees pendant l\'extraction dans d\'autres bases : ' + ', '.join(data[:10])
+                      + '. Normal si une autre application du poste ecrit en ce moment ; sinon, le script a contourne le '
+                      'bac a sable : ne pas utiliser ce resultat et le signaler.', file=sys.stderr)
+            if struct:
+                print('ATTENTION : des tables HORS base jetable ont ete creees, supprimees ou recreees pendant l\'extraction :',
+                      file=sys.stderr)
+                for x in struct[:20]:
+                    print('  ' + x, file=sys.stderr)
                 sys.exit(3)
         model['source'] = ({'kind': 'sql', 'name': os.path.basename(a.sql)} if a.sql
                            else {'kind': 'laravel', 'name': os.path.basename(os.path.abspath(a.laravel))})
@@ -513,4 +559,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except RuntimeError as e:  # erreur MySQL (syntaxe du script, droits, serveur) : message, pas de trace Python
+        sys.exit('erreur : %s' % e)  # MySQL (syntaxe, droits, serveur) ou php artisan migrate

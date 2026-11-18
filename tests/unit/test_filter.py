@@ -40,6 +40,29 @@ BAD = {
     # relecture : chaine ouverte dans un commentaire executable, commentaire executable MariaDB
     'chaine ouverte dans un executable': "/*! SET @a='*/' ; USE prod; -- '*/",
     'executable MariaDB /*M!': '/*M!100100 USE prod */; CREATE TABLE t (id INT);',
+    # revue du 2026-11-18 : tables qui lisent ou ecrivent hors de la base jetable
+    'ENGINE=FEDERATED + CONNECTION': "CREATE TABLE t (id INT) ENGINE=FEDERATED CONNECTION='mysql://root@127.0.0.1:3306/prod/users';",
+    'ENGINE FEDERATED sans =': "CREATE TABLE t (id INT) ENGINE FEDERATED;",
+    'ENGINE=CONNECT + FILE_NAME (MariaDB)': "CREATE TABLE t (l VARCHAR(200)) ENGINE=CONNECT TABLE_TYPE=DOS FILE_NAME='/etc/passwd';",
+    'ENGINE=SPIDER (MariaDB)': "CREATE TABLE t (id INT) ENGINE=SPIDER COMMENT='wrapper \"mysql\", srv \"prod\"';",
+    'DATA DIRECTORY': "CREATE TABLE t (id INT) DATA DIRECTORY='/tmp/x';",
+    'INDEX DIRECTORY': "CREATE TABLE t (id INT) INDEX DIRECTORY='/tmp/x';",
+    'ALTER vers FEDERATED': "CREATE TABLE t (id INT); ALTER TABLE t ENGINE=FEDERATED;",
+    # -- nu en fin de ligne : MySQL execute la ligne suivante (verifie : "--\nSELECT 42;" rend 42), le filtre l'avalait
+    '-- nu puis USE': "--\nUSE prod;\nCREATE TABLE t (id INT);",
+    '-- nu (CRLF) puis DROP DATABASE': "--\r\nDROP DATABASE prod;\nCREATE TABLE t (id INT);",
+    '-- nu en fin de fichier precede': "CREATE TABLE t (id INT); --\nDROP TABLE prod.users;",
+    # relecture du 2026-11-18 : moteur en chaine ou en backticks, CONNECTION sans =, -- suivi d'un caractere de controle,
+    # bloc compose MariaDB
+    'ENGINE en chaine + CONNECTION sans =': "CREATE TABLE t (id int) ENGINE='FEDERATED' CONNECTION 'mysql://root@127.0.0.1/prod/u';",
+    'ENGINE entre guillemets doubles': 'CREATE TABLE t (id int) ENGINE="FEDERATED";',
+    'ENGINE entre backticks': 'CREATE TABLE t (id int) ENGINE=`FEDERATED`;',
+    'ALTER vers CONNECT en chaine': "CREATE TABLE t (id int); ALTER TABLE t ENGINE='CONNECT';",
+    'CONNECTION sans = sur InnoDB': "CREATE TABLE t (id int) ENGINE=InnoDB CONNECTION 'x';",
+    '-- puis tabulation verticale': "CREATE TABLE t (a INT) --\x0b '\n; USE prod; -- '\n",
+    '-- puis saut de page': "CREATE TABLE t (a INT) --\x0c '\n; USE prod; -- '\n",
+    '-- puis caractere de controle': "CREATE TABLE t (a INT) --\x01 '\n; USE prod; -- '\n",
+    'BEGIN NOT ATOMIC (bloc compose MariaDB)': 'BEGIN NOT ATOMIC END;',
 }
 GOOD = {
     'defaut decimal et chaine a point': "CREATE TABLE t (id INT PRIMARY KEY, r DECIMAL(5,2) DEFAULT 1.5, n VARCHAR(20) DEFAULT 'a.b');",
@@ -56,6 +79,18 @@ GOOD = {
     'nombre decimal': "CREATE TABLE t (r DECIMAL(5,2) DEFAULT 0.25);",
     'en-tete mariadb-dump (mode restreint)': '/*M!999999\\- enable the sandbox mode */ \nCREATE TABLE t (id INT);',
     'executable MariaDB inoffensif': '/*M!100100 SET @x=1 */; CREATE TABLE t (id INT);',
+    # revue du 2026-11-18 : exports reels promis par le README, moteurs locaux, colonne nommee engine
+    'export phpMyAdmin (START TRANSACTION, COMMIT)': open(os.path.join(FIX, 'phpmyadmin.sql'), encoding='utf-8').read(),
+    'export Adminer': open(os.path.join(FIX, 'adminer.sql'), encoding='utf-8').read(),
+    'moteurs locaux': "CREATE TABLE a (id INT) ENGINE=InnoDB; CREATE TABLE b (id INT) ENGINE=MyISAM; CREATE TABLE c (id INT) ENGINE = MEMORY;",
+    'colonne nommee engine ou connection': "CREATE TABLE t (`engine` VARCHAR(20), connection_id INT, data_dir VARCHAR(5));",
+    'BEGIN / ROLLBACK': "BEGIN; CREATE TABLE t (id INT); ROLLBACK;",
+    'BEGIN WORK / COMMIT WORK': "BEGIN WORK; CREATE TABLE t (id INT); COMMIT WORK;",
+    'moteur InnoDB entre backticks': "CREATE TABLE t (id INT) ENGINE=`InnoDB`;",
+    # 2e relecture : variables et colonnes entre backticks ne sont pas des options de table
+    'variables @connection et @engine': "SET @connection = 1; SET @engine = 'x'; CREATE TABLE t (id INT);",
+    'colonnes engine/connection affectees entre backticks': "CREATE TABLE t (`engine` VARCHAR(9), `connection` INT); "
+                                                            "INSERT INTO t SET `engine`='x', `connection`=1;",
 }
 
 

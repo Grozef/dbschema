@@ -49,7 +49,7 @@ def fake_rows(tables=TABLES, cols=COLS, stats=STATS, kcu=KCU):
 @pytest.fixture
 def model(monkeypatch):
     monkeypatch.setattr(extract, 'rows', fake_rows())
-    monkeypatch.setattr(extract, 'server', lambda: ('mysql', (8, 4)))
+    monkeypatch.setattr(extract, 'server', lambda: ('mysql', (8, 4), False))
     return extract.read_model(DB)
 
 
@@ -86,7 +86,7 @@ def test_mysql_garde_default_brut(model):
 
 def test_mariadb_default_normalise(monkeypatch):
     monkeypatch.setattr(extract, 'rows', fake_rows())
-    monkeypatch.setattr(extract, 'server', lambda: ('mariadb', (11, 4)))
+    monkeypatch.setattr(extract, 'server', lambda: ('mariadb', (11, 4), False))
     m = extract.read_model(DB)
     assert {x['name']: x for x in m['tables']['ext']['columns']}['u_id']['default'] == 'abc'
 
@@ -94,6 +94,46 @@ def test_mariadb_default_normalise(monkeypatch):
 @pytest.mark.parametrize('bad', ['a\nb', 'a\tb', 'a\x00b', 'a b', 'a\x85b'])
 def test_nom_avec_caractere_de_controle_refuse(monkeypatch, bad):
     monkeypatch.setattr(extract, 'rows', fake_rows(tables=['p', bad], cols=COLS[:2]))
-    monkeypatch.setattr(extract, 'server', lambda: ('mysql', (8, 4)))
+    monkeypatch.setattr(extract, 'server', lambda: ('mysql', (8, 4), False))
     with pytest.raises(SystemExit, match='caracteres de controle'):
         extract.read_model(DB)
+
+
+def test_casse_sensible_base_homonyme_est_externe(monkeypatch):
+    """Linux (lower_case_table_names=0), verifie sur MySQL 8.4 : « Zz_dbschema_unit » est une AUTRE base que « zz_dbschema_unit ».
+    La table cible « p » existe aussi dans la base lue : seule la comparaison exacte du schema rend la FK externe."""
+    monkeypatch.setattr(extract, 'rows', fake_rows(kcu=KCU + [fk('f_case', 'ext', 'u_id', 'p', 'id', schema='Zz_dbschema_unit')]))
+    monkeypatch.setattr(extract, 'server', lambda: ('mysql', (8, 4), True))
+    m = extract.read_model(DB)
+    assert 'ext.u_id -> Zz_dbschema_unit.p' in m['external_fks']
+    assert not any(r['name'] == 'f_case' for r in m['relations'])
+
+
+def test_casse_insensible_meme_base_est_interne(monkeypatch):
+    """Windows / macOS : la meme base ecrite autrement est la meme ; FK interne."""
+    monkeypatch.setattr(extract, 'rows', fake_rows(kcu=KCU + [fk('f_case', 'ext', 'u_id', 'p', 'id', schema='Zz_dbschema_unit')]))
+    monkeypatch.setattr(extract, 'server', lambda: ('mysql', (8, 4), False))
+    m = extract.read_model(DB)
+    assert any(r['name'] == 'f_case' and r['to'] == 'p' for r in m['relations'])
+
+
+def test_macos_reference_en_minuscules_vers_table_en_casse_mixte(monkeypatch):
+    """lower_case_table_names=2 (macOS) : InnoDB range le nom reference en minuscules (« users ») alors que la table s'appelle
+    « Users » : la FK reste interne et pointe vers le nom du modele (relecture du 2026-11-18 ; d'apres la doc, non execute)."""
+    tables = TABLES + ['Users']
+    cols = COLS + [col('Users', 'id', key='PRI')]
+    kcu = KCU + [fk('f_mac', 'ext', 'u_id', 'users', 'id')]
+    monkeypatch.setattr(extract, 'rows', fake_rows(tables=tables, cols=cols, kcu=kcu))
+    monkeypatch.setattr(extract, 'server', lambda: ('mysql', (8, 4), False))
+    m = extract.read_model(DB)
+    assert any(r['name'] == 'f_mac' and r['to'] == 'Users' for r in m['relations']), m['external_fks']
+
+
+def test_reference_vers_table_absente_jamais_dessinee(monkeypatch):
+    """Garde : une table referencee absente du modele ne produit jamais de relation (sinon crash d'ELK au build)."""
+    monkeypatch.setattr(extract, 'rows', fake_rows(kcu=KCU + [fk('f_abs', 'ext', 'u_id', 'absente', 'id')]))
+    for sensible in (True, False):
+        monkeypatch.setattr(extract, 'server', lambda s=sensible: ('mysql', (8, 4), s))
+        m = extract.read_model(DB)
+        assert all(r['to'] in m['tables'] for r in m['relations'])
+        assert 'ext.u_id -> %s.absente' % DB in m['external_fks']

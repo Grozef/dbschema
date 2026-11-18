@@ -1,3 +1,5 @@
 # Dependances de DEVELOPPEMENT seulement (tests et CI) : le skill lui-meme n'a besoin que de la bibliotheque standard.
-pytest==8.4.2
+-r requirements-unit.txt
 playwright==1.63.0
+coverage==7.10.7
+pytest-cov==6.3.0

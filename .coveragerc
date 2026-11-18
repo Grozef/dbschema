@@ -1,0 +1,9 @@
+# Couverture du code Python livre (lib/). DBSCHEMA_COV=1 : les appels de extract.py en sous-processus sont mesures aussi.
+[run]
+source = lib
+branch = true
+data_file = .coverage
+
+[report]
+show_missing = true
+skip_covered = false

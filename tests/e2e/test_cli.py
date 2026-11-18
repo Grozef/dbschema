@@ -11,6 +11,10 @@ def test_commande_reussit(demo):
     assert views == ['all', 'keys', 'names', 'all-full', 'all-frames']
 
 
+def test_rappel_de_lecture_si_png_neuf(demo, chrome):
+    assert 'RAPPEL : LIRE' in demo['log'] and 'PNG NON PRODUIT' not in demo['log']
+
+
 def test_livrables_presents(demo):
     for f in ('DEMO.html', 'DEMO.png', 'DEMO.sql', 'DEMO_workbench_layout.py', 'DEMO_layout.mwb'):
         p = demo['out'] / f
@@ -62,3 +66,15 @@ def test_sans_navigateur(db, bash, tmp_path):
     assert code == 0, out[-800:]
     assert 'PNG non produit' in out and 'debordement non mesure' in out
     assert (tmp_path / 'NB.html').exists() and (tmp_path / 'NB.sql').exists() and not (tmp_path / 'NB.png').exists()
+    assert 'PNG NON PRODUIT par cette execution' in out and 'RAPPEL : LIRE' not in out
+
+
+def test_ancien_png_jamais_presente_comme_neuf(db, bash, tmp_path):
+    """Relance sans navigateur dans un dossier qui contient le PNG d'une execution precedente : le rappel de lecture ne doit
+    pas viser cet ancien fichier (revue du 2026-11-18)."""
+    (tmp_path / 'NB.png').write_bytes(b'\x89PNG ancien')
+    os.utime(tmp_path / 'NB.png', (1, 1))
+    code, out = run([bash, os.path.join(ROOT, 'dbschema.sh'), 'all', '--sql', os.path.join(FIX, 'edge-cases.sql'),
+                     '--out', str(tmp_path), '--name', 'NB'], env={**os.environ, 'DBSCHEMA_CHROME': 'none'})
+    assert code == 0, out[-800:]
+    assert 'PNG NON PRODUIT par cette execution' in out and 'RAPPEL : LIRE' not in out

@@ -49,7 +49,7 @@ Variables d'environnement facultatives :
 | `DBSCHEMA_MYSQL_PORT` | Port du serveur | `3306` |
 | `DBSCHEMA_MYSQL_USER` | Utilisateur | `root` |
 | `DBSCHEMA_MYSQL_PASSWORD` | Mot de passe | aucun |
-| `DBSCHEMA_CHROME` | Chemin du navigateur | Chrome, Edge ou Chromium détecté |
+| `DBSCHEMA_CHROME` | Chemin du navigateur (`none` : aucun, HTML et SQL seulement) | Chrome, Edge ou Chromium détecté |
 
 ### Selon votre installation
 
@@ -80,7 +80,8 @@ Dans Claude Code : `/dbschema mon_schema.sql`, ou une demande comme « dessine l
 
 ```bash
 bash ~/.claude/skills/dbschema/dbschema.sh all --sql schema.sql --out sortie --name MON_SCHEMA \
-  [--groups domaines.json] [--cards cardinalites.json] [--frames] [--hub 8|off] [--mwb modele.mwb]
+  [--groups domaines.json] [--cards cardinalites.json] [--frames] [--hub 8|off] [--title "..."] [--mwb modele.mwb]
+# autres sources : --db ma_base, ou --laravel chemin/du/depot --trust-repo [--keep-framework]
 ```
 
 Options :
@@ -104,7 +105,7 @@ Pour Symfony, Django, Rails, Prisma ou tout autre outil de migrations, lancez vo
 bash ~/.claude/skills/dbschema/dbschema.sh all --db ma_base_dev --out sortie --name MON_SCHEMA
 ```
 
-Les tables techniques du framework (`doctrine_migration_versions`, `django_migrations`, `schema_migrations`, `_prisma_migrations`...) apparaissent alors dans le schéma. Autre voie : un export de structure (phpMyAdmin, Adminer, `mysqldump --no-data`) passé à `--sql`.
+Les tables techniques du framework (`doctrine_migration_versions`, `django_migrations`, `schema_migrations`, `_prisma_migrations`...) apparaissent alors dans le schéma. Autre voie : un export de structure (phpMyAdmin, Adminer, `mysqldump --no-data`) passé à `--sql`. Les tests le vérifient sur un export type de chaque outil (`tests/fixtures/phpmyadmin.sql`, `adminer.sql`), pas sur toutes leurs versions ; un fichier enregistré en UTF-8 avec BOM est accepté.
 
 ## Sécurité
 
@@ -114,11 +115,12 @@ Les tables techniques du framework (`doctrine_migration_versions`, `django_migra
 
 `--sql` et `--laravel` exécutent du code fourni par l'utilisateur. Garde-fous :
 - **Base et utilisateur jetables.** Le script s'exécute dans une base `zz_dbschema_<horodatage>`, avec un utilisateur MySQL du même nom qui n'a de droits que sur cette base. Les deux sont supprimés à la fin, même en cas d'erreur ; si le processus est tué, au lancement suivant (après une heure).
-- **Filtre avant exécution.** Un premier filtre refuse, avec un message lisible : `USE`, `CREATE/DROP DATABASE`, les noms `base.table`, `SET GLOBAL`, les modes SQL qui changent la lecture des chaînes, et les commandes du client `mysql`. Le client tourne en `--binary-mode`.
+- **Filtre avant exécution.** Un premier filtre refuse, avec un message lisible : `USE`, `CREATE/DROP DATABASE`, les noms `base.table`, `SET GLOBAL`, les modes SQL qui changent la lecture des chaînes, les commandes du client `mysql`, et les tables qui lisent ou écrivent hors de la base (`ENGINE=FEDERATED`, `CONNECT`, `SPIDER`, y compris écrits entre guillemets ou backticks, `CONNECTION`, `DATA DIRECTORY`). Le client tourne en `--binary-mode`.
 - **Laravel.** `DB_URL` est neutralisé. La configuration effective est lue avant `migrate`, et les migrations qui changent de connexion sont refusées.
 - **Identifiants.** Ils passent par un fichier d'options temporaire, jamais par la ligne de commande. Le `my.ini` du serveur est ignoré et `local-infile` est désactivé.
-- **Noms piégés.** Un nom de table ou de colonne qui contient un caractère de contrôle est refusé : il pourrait injecter du code dans le script Workbench généré.
-- **Relevé avant/après.** Les tables des autres bases sont relevées avant et après : un écart arrête tout.
+- **Noms piégés.** Un nom de table, de colonne ou de vue qui contient un caractère de contrôle est refusé : il pourrait injecter du code dans le script Workbench généré, ou faire passer une vue dans le SQL exporté.
+- **Relevé avant/après.** Les tables des autres bases sont relevées avant et après : une table créée, supprimée ou recréée ailleurs arrête tout (code 3). Une écriture de données ailleurs est signalée par un avertissement sans bloquer : c'est normal si une autre application du poste écrit à ce moment ; sinon, ne pas utiliser le résultat.
+- **Page HTML.** Sa politique de sécurité (CSP) n'autorise qu'un script, désigné par son empreinte SHA-256 (`assets/viewer.js`), et aucune connexion : un script injecté par un nom de table ne s'exécuterait pas.
 
 Limites : voir la section *Limites connues* de [`SKILL.md`](SKILL.md).
 
@@ -142,7 +144,12 @@ bash dbschema.sh test                        # node:test (tests/js) puis pytest 
 bash dbschema.sh test -m unit                # sans base ni navigateur
 bash dbschema.sh test -m "not perf"          # tout sauf les budgets de performance
 python tests/compat_test.py <dossier_temp>   # Docker : MariaDB 11.4, MySQL 5.7, MySQL 8.4, Linux
+# couverture de lib/ : Python (sous-processus compris) puis JS
+DBSCHEMA_COV=1 python -m pytest -m "not perf" --cov --cov-config=.coveragerc --cov-report=term-missing
+node --test --experimental-test-coverage --test-coverage-include='lib/**' tests/js/*.test.mjs
 ```
+
+Chaque test a un délai de 10 minutes (`pytest-timeout`) et chaque job de CI un délai de 15 minutes (30 pour CodeQL) : un test figé échoue au lieu de bloquer.
 
 | Dossier | Marqueur | Contenu |
 |---|---|---|
@@ -159,8 +166,8 @@ Sans serveur ou sans navigateur, les tests qui en dépendent sont sautés, et py
 
 GitHub Actions (`.github/workflows/`), à chaque push sur `dev` ou `main` et à chaque PR vers `main` :
 - `static` ;
-- `unit` : Linux, Windows et macOS, Python 3.9 et 3.13, Node 18 et 24 ;
-- `db` : MySQL 8.4, MySQL 5.7 et MariaDB 11.4 ;
+- `unit` : Linux, Windows et macOS, Python 3.9 et 3.13, Node 18 et 24 ; couverture JS de `lib/` (seuils : lignes 95 %, branches 85 %, fonctions 95 %) ;
+- `db` : MySQL 8.4, MySQL 5.7 et MariaDB 11.4, toute la suite hors perf ; couverture Python de `lib/` (seuil 90 %) ;
 - `render` : PNG sous Windows et macOS ;
 - `perf` ;
 - `security` : Bandit, `npm audit`, gitleaks ;

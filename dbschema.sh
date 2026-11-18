@@ -2,7 +2,7 @@
 # dbschema : schema de BDD relationnelle -> HTML interactif + PNG + SQL (+ mise en page Workbench).
 # Usage :
 #   dbschema.sh all  (--sql F | --laravel DIR | --db NOM) --out DIR --name NOM [--groups F.json] [--cards F.json] [--frames]
-#                    [--hub K|off] [--title "..."] [--mwb MODELE.mwb]
+#                    [--hub K|off] [--title "..."] [--mwb MODELE.mwb] [--trust-repo] [--keep-framework]
 #   dbschema.sh test [options pytest]   tests du skill : node:test (tests/js) puis pytest (ex. -m unit, -m "not perf")
 # Ecritures BDD : uniquement dans des bases jetables zz_dbschema_* (supprimees en fin d'extraction, meme en erreur).
 # Workbench n'est jamais lance (mono-instance : un --run-script part dans la session ouverte de l'utilisateur).
@@ -28,10 +28,11 @@ case "$cmd" in
   *) sed -n '2,9p' "$0"; exit 2 ;;
 esac
 
-src=() out="" name="" groups="" cards="" frames="" hub="" title="" mwb="" trust=""
+src=() out="" name="" groups="" cards="" frames="" hub="" title="" mwb="" trust="" keep=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --sql|--laravel|--db) src=("$1" "$2"); shift 2 ;;
+    --sql|--laravel|--db) [ ${#src[@]} -eq 0 ] || die "une seule source (${src[0]} deja donnee, puis $1)"; src=("$1" "$2"); shift 2 ;;
+    --keep-framework) keep="--keep-framework"; shift ;;
     --out) out="$2"; shift 2 ;;
     --name) name="$2"; shift 2 ;;
     --groups) groups="$2"; shift 2 ;;
@@ -50,9 +51,10 @@ done
 [ -n "$out" ] && [ -n "$name" ] || die "--out et --name obligatoires"
 [ -d "$SKILL/node_modules/elkjs" ] || (cd "$SKILL" && npm ci --ignore-scripts --no-audit --no-fund >/dev/null) || die "npm ci a echoue dans $SKILL"
 mkdir -p "$out/_build"
+debut="$out/_build/.debut"; : > "$debut"  # repere de date : un livrable plus ancien vient d'une execution precedente
 
 echo "== extraction"
-"${PY[@]}" "$SKILL/lib/extract.py" "${src[@]}" --out "$out/_build/model.json" --sql-out "$out/$name.sql" ${groups:+--groups "$groups"} ${cards:+--cards "$cards"} ${trust:+"$trust"}
+"${PY[@]}" "$SKILL/lib/extract.py" "${src[@]}" --out "$out/_build/model.json" --sql-out "$out/$name.sql" ${groups:+--groups "$groups"} ${cards:+--cards "$cards"} ${trust:+"$trust"} ${keep:+"$keep"}
 
 echo "== mise en page, controles, rendus"
 node "$SKILL/lib/build.mjs" "$out/_build/model.json" "$out" "$name" ${frames:+"$frames"} ${hub:+"$hub"} --title="${title:-$name}"
@@ -64,4 +66,8 @@ if [ -n "$mwb" ]; then
 fi
 echo "== livrables"
 ls -la "$out" | grep -v "_build"
-echo "RAPPEL : LIRE $out/$name.png (outil Read) avant d'annoncer quoi que ce soit."
+if [ "$out/$name.png" -nt "$debut" ]; then
+  echo "RAPPEL : LIRE $out/$name.png (outil Read) avant d'annoncer quoi que ce soit."
+else
+  echo "PNG NON PRODUIT par cette execution : $out/$name.png absent ou ancien (ne pas le lire comme le resultat). Verifier le HTML."
+fi
