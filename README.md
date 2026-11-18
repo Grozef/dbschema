@@ -137,20 +137,36 @@ Chaque vue passe des contrôles bloquants avant d'être livrée :
 ## Tests
 
 ```bash
-bash dbschema.sh test
-python tests/ui_test.py <fichier.html> <dossier_captures>
-python tests/overflow_test.py <fichier.html>
-python tests/compat_test.py <dossier_temporaire>   # Docker requis : MariaDB 11.4, MySQL 5.7, MySQL 8.4, Linux
+pip install -r requirements-dev.txt          # pytest, Playwright (tests seulement)
+bash dbschema.sh test                        # node:test (tests/js) puis pytest (tests/)
+bash dbschema.sh test -m unit                # sans base ni navigateur
+bash dbschema.sh test -m "not perf"          # tout sauf les budgets de performance
+python tests/compat_test.py <dossier_temp>   # Docker : MariaDB 11.4, MySQL 5.7, MySQL 8.4, Linux
 ```
 
-La suite couvre :
-- les cardinalités des cas limites ;
-- tous les contrôles, y compris des mutations qui doivent les faire échouer ;
-- les scripts SQL dangereux, qui doivent être refusés ;
-- l'isolation de l'utilisateur jetable, vérifiée contre une base témoin ;
-- l'aller-retour SQL → schéma → SQL.
+| Dossier | Marqueur | Contenu |
+|---|---|---|
+| `tests/js/` | `node:test` | mise en page, contrôles (avec des mutations qui doivent les faire échouer), échappement du SVG et du HTML |
+| `tests/unit/` | `unit` | filtre SQL, binaires et connexion, modèle et cardinalités sur des données injectées, `--cards`, Laravel, Workbench et `.mwb` |
+| `tests/functional/` | `functional` | extraction sur un vrai serveur, modèle identique quel que soit le serveur, aller-retour SQL, `--db` en lecture seule |
+| `tests/e2e/` | `e2e` | `dbschema.sh all` de bout en bout, PNG, script Workbench, `.mwb`, interface sous Playwright, débordements, mode sans navigateur |
+| `tests/perf/` | `perf` | schémas générés de 25, 100 et 250 tables, budgets de temps et de taille (`budgets.json`) bloquants en CI Linux ; ailleurs, mesures affichées sans budget |
+| `tests/security/` | `security` | utilisateur jetable contre une base témoin, constats des audits, fuzz du filtre (2 000 scripts), XSS dans le navigateur, arguments piégés |
 
-`ui_test.py` teste les interactions de la page HTML ; `overflow_test.py` vérifie qu'aucun texte ne déborde. La suite principale crée et supprime des bases et un utilisateur `zz_dbschema_*` : à lancer sur un serveur de développement.
+Sans serveur ou sans navigateur, les tests qui en dépendent sont sautés, et pytest le signale. En CI, `DBSCHEMA_REQUIRE_DB=1` et `DBSCHEMA_REQUIRE_BROWSER=1` en font des échecs. Les tests créent et suppriment des bases et des comptes `zz_dbschema_*` : à lancer sur un serveur de développement.
+
+### Intégration continue
+
+GitHub Actions (`.github/workflows/`), à chaque push sur `dev` ou `main` et à chaque PR vers `main` :
+- `static` ;
+- `unit` : Linux, Windows et macOS, Python 3.9 et 3.13, Node 18 et 24 ;
+- `db` : MySQL 8.4, MySQL 5.7 et MariaDB 11.4 ;
+- `render` : PNG sous Windows et macOS ;
+- `perf` ;
+- `security` : Bandit, `npm audit`, gitleaks ;
+- `codeql` ;
+- sur les PR seulement, `dependency-review`.
+
 
 ## Licence
 

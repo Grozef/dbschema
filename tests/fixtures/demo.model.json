@@ -1,0 +1,2164 @@
+{
+ "tables": {
+  "addresses": {
+   "name": "addresses",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "user_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "label",
+     "type": "varchar(50)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "street",
+     "type": "varchar(190)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "city",
+     "type": "varchar(100)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "postal_code",
+     "type": "varchar(20)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "country_iso",
+     "type": "char(2)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "country_iso",
+     "unique": false,
+     "columns": [
+      "country_iso"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "user_id",
+     "unique": false,
+     "columns": [
+      "user_id"
+     ]
+    }
+   ]
+  },
+  "audit_logs": {
+   "name": "audit_logs",
+   "comment": "Journal (aucune FK entrante)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "user_id",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "action",
+     "type": "varchar(60)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "entity",
+     "type": "varchar(60)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "entity_id",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "payload",
+     "type": "json",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "created_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "user_id",
+     "unique": false,
+     "columns": [
+      "user_id"
+     ]
+    }
+   ]
+  },
+  "authors": {
+   "name": "authors",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "full_name",
+     "type": "varchar(150)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "birth_year",
+     "type": "smallint",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "biography",
+     "type": "text",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "book_authors": {
+   "name": "book_authors",
+   "comment": "Table de liaison, PK composite",
+   "columns": [
+    {
+     "name": "book_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": true,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "author_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": true,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "position",
+     "type": "tinyint",
+     "nullable": false,
+     "default": "1",
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "author_id",
+     "unique": false,
+     "columns": [
+      "author_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "book_id",
+      "author_id"
+     ]
+    }
+   ]
+  },
+  "books": {
+   "name": "books",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "isbn",
+     "type": "char(13)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": true
+    },
+    {
+     "name": "title",
+     "type": "varchar(255)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "category_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "publisher_id",
+     "type": "int",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "price",
+     "type": "decimal(8,2)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "published_on",
+     "type": "date",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "created_by",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "created_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "category_id",
+     "unique": false,
+     "columns": [
+      "category_id"
+     ]
+    },
+    {
+     "name": "created_by",
+     "unique": false,
+     "columns": [
+      "created_by"
+     ]
+    },
+    {
+     "name": "isbn",
+     "unique": true,
+     "columns": [
+      "isbn"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "publisher_id",
+     "unique": false,
+     "columns": [
+      "publisher_id"
+     ]
+    }
+   ]
+  },
+  "categories": {
+   "name": "categories",
+   "comment": "Arborescence (auto-reference)",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "parent_id",
+     "type": "int",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "name",
+     "type": "varchar(100)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "slug",
+     "type": "varchar(120)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": true
+    }
+   ],
+   "indexes": [
+    {
+     "name": "parent_id",
+     "unique": false,
+     "columns": [
+      "parent_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "slug",
+     "unique": true,
+     "columns": [
+      "slug"
+     ]
+    }
+   ]
+  },
+  "countries": {
+   "name": "countries",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "iso_code",
+     "type": "char(2)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": true
+    },
+    {
+     "name": "name",
+     "type": "varchar(80)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "iso_code",
+     "unique": true,
+     "columns": [
+      "iso_code"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "coupons": {
+   "name": "coupons",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "code",
+     "type": "varchar(40)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": true
+    },
+    {
+     "name": "percent_off",
+     "type": "tinyint",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "valid_until",
+     "type": "date",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "created_by",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "code",
+     "unique": true,
+     "columns": [
+      "code"
+     ]
+    },
+    {
+     "name": "created_by",
+     "unique": false,
+     "columns": [
+      "created_by"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "order_items": {
+   "name": "order_items",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "order_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "book_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "quantity",
+     "type": "smallint",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "unit_price",
+     "type": "decimal(8,2)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "book_id",
+     "unique": false,
+     "columns": [
+      "book_id"
+     ]
+    },
+    {
+     "name": "order_id",
+     "unique": false,
+     "columns": [
+      "order_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "orders": {
+   "name": "orders",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "number",
+     "type": "varchar(30)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": true
+    },
+    {
+     "name": "customer_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "shipping_address_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "billing_address_id",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "coupon_id",
+     "type": "int",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "handled_by",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "status",
+     "type": "varchar(30)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "total",
+     "type": "decimal(10,2)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "placed_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "billing_address_id",
+     "unique": false,
+     "columns": [
+      "billing_address_id"
+     ]
+    },
+    {
+     "name": "coupon_id",
+     "unique": false,
+     "columns": [
+      "coupon_id"
+     ]
+    },
+    {
+     "name": "customer_id",
+     "unique": false,
+     "columns": [
+      "customer_id"
+     ]
+    },
+    {
+     "name": "handled_by",
+     "unique": false,
+     "columns": [
+      "handled_by"
+     ]
+    },
+    {
+     "name": "number",
+     "unique": true,
+     "columns": [
+      "number"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "shipping_address_id",
+     "unique": false,
+     "columns": [
+      "shipping_address_id"
+     ]
+    }
+   ]
+  },
+  "payments": {
+   "name": "payments",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "order_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "provider",
+     "type": "varchar(40)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "amount",
+     "type": "decimal(10,2)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "paid_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "refunded_by",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "order_id",
+     "unique": false,
+     "columns": [
+      "order_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "refunded_by",
+     "unique": false,
+     "columns": [
+      "refunded_by"
+     ]
+    }
+   ]
+  },
+  "publishers": {
+   "name": "publishers",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "name",
+     "type": "varchar(150)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "website",
+     "type": "varchar(190)",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "reviews": {
+   "name": "reviews",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "book_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "user_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "rating",
+     "type": "tinyint",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "body",
+     "type": "text",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "moderated_by",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "created_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "book_id",
+     "unique": true,
+     "columns": [
+      "book_id",
+      "user_id"
+     ]
+    },
+    {
+     "name": "moderated_by",
+     "unique": false,
+     "columns": [
+      "moderated_by"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "user_id",
+     "unique": false,
+     "columns": [
+      "user_id"
+     ]
+    }
+   ]
+  },
+  "shipments": {
+   "name": "shipments",
+   "comment": "1:1 avec orders",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "order_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": true
+    },
+    {
+     "name": "warehouse_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "carrier",
+     "type": "varchar(60)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "tracking_number",
+     "type": "varchar(80)",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "prepared_by",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "shipped_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "order_id",
+     "unique": true,
+     "columns": [
+      "order_id"
+     ]
+    },
+    {
+     "name": "prepared_by",
+     "unique": false,
+     "columns": [
+      "prepared_by"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "warehouse_id",
+     "unique": false,
+     "columns": [
+      "warehouse_id"
+     ]
+    }
+   ]
+  },
+  "stock_levels": {
+   "name": "stock_levels",
+   "comment": "",
+   "columns": [
+    {
+     "name": "warehouse_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": true,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "book_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": true,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "quantity",
+     "type": "int",
+     "nullable": false,
+     "default": "0",
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "updated_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "book_id",
+     "unique": false,
+     "columns": [
+      "book_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "warehouse_id",
+      "book_id"
+     ]
+    }
+   ]
+  },
+  "user_profiles": {
+   "name": "user_profiles",
+   "comment": "1:1 avec users",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "user_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": true
+    },
+    {
+     "name": "birth_date",
+     "type": "date",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "newsletter",
+     "type": "tinyint(1)",
+     "nullable": false,
+     "default": "0",
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "user_id",
+     "unique": true,
+     "columns": [
+      "user_id"
+     ]
+    }
+   ]
+  },
+  "users": {
+   "name": "users",
+   "comment": "Clients et personnel",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "email",
+     "type": "varchar(190)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": true
+    },
+    {
+     "name": "display_name",
+     "type": "varchar(120)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "password_hash",
+     "type": "varchar(255)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "is_staff",
+     "type": "tinyint(1)",
+     "nullable": false,
+     "default": "0",
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "created_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "updated_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "email",
+     "unique": true,
+     "columns": [
+      "email"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "warehouses": {
+   "name": "warehouses",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "name",
+     "type": "varchar(100)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "country_iso",
+     "type": "char(2)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "country_iso",
+     "unique": false,
+     "columns": [
+      "country_iso"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "wishlists": {
+   "name": "wishlists",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "user_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "book_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "added_at",
+     "type": "timestamp",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "book_id",
+     "unique": false,
+     "columns": [
+      "book_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "user_id",
+     "unique": false,
+     "columns": [
+      "user_id"
+     ]
+    }
+   ]
+  }
+ },
+ "relations": [
+  {
+   "name": "addresses_ibfk_1",
+   "from": "addresses",
+   "to": "users",
+   "columns": [
+    "user_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "CASCADE",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "addresses_ibfk_2",
+   "from": "addresses",
+   "to": "countries",
+   "columns": [
+    "country_iso"
+   ],
+   "ref_columns": [
+    "iso_code"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "audit_logs_ibfk_1",
+   "from": "audit_logs",
+   "to": "users",
+   "columns": [
+    "user_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "book_authors_ibfk_1",
+   "from": "book_authors",
+   "to": "books",
+   "columns": [
+    "book_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "CASCADE",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "book_authors_ibfk_2",
+   "from": "book_authors",
+   "to": "authors",
+   "columns": [
+    "author_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "books_ibfk_1",
+   "from": "books",
+   "to": "categories",
+   "columns": [
+    "category_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "books_ibfk_2",
+   "from": "books",
+   "to": "publishers",
+   "columns": [
+    "publisher_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "books_ibfk_3",
+   "from": "books",
+   "to": "users",
+   "columns": [
+    "created_by"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "categories_ibfk_1",
+   "from": "categories",
+   "to": "categories",
+   "columns": [
+    "parent_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "coupons_ibfk_1",
+   "from": "coupons",
+   "to": "users",
+   "columns": [
+    "created_by"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "order_items_ibfk_1",
+   "from": "order_items",
+   "to": "orders",
+   "columns": [
+    "order_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "CASCADE",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "order_items_ibfk_2",
+   "from": "order_items",
+   "to": "books",
+   "columns": [
+    "book_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "orders_ibfk_1",
+   "from": "orders",
+   "to": "users",
+   "columns": [
+    "customer_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "orders_ibfk_2",
+   "from": "orders",
+   "to": "addresses",
+   "columns": [
+    "shipping_address_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "orders_ibfk_3",
+   "from": "orders",
+   "to": "addresses",
+   "columns": [
+    "billing_address_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "orders_ibfk_4",
+   "from": "orders",
+   "to": "coupons",
+   "columns": [
+    "coupon_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "orders_ibfk_5",
+   "from": "orders",
+   "to": "users",
+   "columns": [
+    "handled_by"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "payments_ibfk_1",
+   "from": "payments",
+   "to": "orders",
+   "columns": [
+    "order_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "payments_ibfk_2",
+   "from": "payments",
+   "to": "users",
+   "columns": [
+    "refunded_by"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "reviews_ibfk_1",
+   "from": "reviews",
+   "to": "books",
+   "columns": [
+    "book_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "CASCADE",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "reviews_ibfk_2",
+   "from": "reviews",
+   "to": "users",
+   "columns": [
+    "user_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "reviews_ibfk_3",
+   "from": "reviews",
+   "to": "users",
+   "columns": [
+    "moderated_by"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "shipments_ibfk_1",
+   "from": "shipments",
+   "to": "orders",
+   "columns": [
+    "order_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..1"
+  },
+  {
+   "name": "shipments_ibfk_2",
+   "from": "shipments",
+   "to": "warehouses",
+   "columns": [
+    "warehouse_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "shipments_ibfk_3",
+   "from": "shipments",
+   "to": "users",
+   "columns": [
+    "prepared_by"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "stock_levels_ibfk_1",
+   "from": "stock_levels",
+   "to": "warehouses",
+   "columns": [
+    "warehouse_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "stock_levels_ibfk_2",
+   "from": "stock_levels",
+   "to": "books",
+   "columns": [
+    "book_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "user_profiles_ibfk_1",
+   "from": "user_profiles",
+   "to": "users",
+   "columns": [
+    "user_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "CASCADE",
+   "card_parent": "1",
+   "card_child": "0..1"
+  },
+  {
+   "name": "warehouses_ibfk_1",
+   "from": "warehouses",
+   "to": "countries",
+   "columns": [
+    "country_iso"
+   ],
+   "ref_columns": [
+    "iso_code"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "wishlists_ibfk_1",
+   "from": "wishlists",
+   "to": "users",
+   "columns": [
+    "user_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "CASCADE",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "wishlists_ibfk_2",
+   "from": "wishlists",
+   "to": "books",
+   "columns": [
+    "book_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "CASCADE",
+   "card_parent": "1",
+   "card_child": "0..N"
+  }
+ ],
+ "external_fks": [],
+ "source": {
+  "kind": "sql",
+  "name": "demo.sql"
+ },
+ "groups": {
+  "CLIENTS": [
+   "users",
+   "user_profiles",
+   "addresses",
+   "countries"
+  ],
+  "CATALOGUE": [
+   "categories",
+   "publishers",
+   "authors",
+   "books",
+   "book_authors"
+  ],
+  "STOCK": [
+   "warehouses",
+   "stock_levels"
+  ],
+  "COMMANDES": [
+   "orders",
+   "order_items",
+   "payments",
+   "shipments",
+   "coupons"
+  ],
+  "AVIS": [
+   "reviews",
+   "wishlists"
+  ],
+  "ADMIN": [
+   "audit_logs"
+  ]
+ }
+}
