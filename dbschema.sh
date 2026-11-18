@@ -3,7 +3,7 @@
 # Usage :
 #   dbschema.sh all  (--sql F | --laravel DIR | --db NOM) --out DIR --name NOM [--groups F.json] [--cards F.json] [--frames]
 #                    [--hub K|off] [--title "..."] [--mwb MODELE.mwb]
-#   dbschema.sh test [DIR_TMP]          suite de tests du skill (cas limites + schema de demonstration)
+#   dbschema.sh test [options pytest]   tests du skill : node:test (tests/js) puis pytest (ex. -m unit, -m "not perf")
 # Ecritures BDD : uniquement dans des bases jetables zz_dbschema_* (supprimees en fin d'extraction, meme en erreur).
 # Workbench n'est jamais lance (mono-instance : un --run-script part dans la session ouverte de l'utilisateur).
 set -euo pipefail
@@ -19,8 +19,11 @@ done
 cmd="${1:-}"; shift || true
 case "$cmd" in
   test)
-    tmp="${1:-$(mktemp -d)}"
-    exec "${PY[@]}" "$SKILL/tests/run_tests.py" "$tmp" ;;
+    # pytest hors -I : il peut etre installe dans le site utilisateur (pip install --user -r requirements-dev.txt)
+    "${PY[0]}" -c 'import pytest' 2>/dev/null || die "pytest absent : pip install -r $SKILL/requirements-dev.txt"
+    [ -d "$SKILL/node_modules/elkjs" ] || (cd "$SKILL" && npm ci --ignore-scripts --no-audit --no-fund >/dev/null) || die "npm ci a echoue"
+    node --test "$SKILL"/tests/js/*.test.mjs || exit 1
+    cd "$SKILL" && exec "${PY[0]}" -m pytest "$@" ;;
   all) ;;
   *) sed -n '2,9p' "$0"; exit 2 ;;
 esac

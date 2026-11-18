@@ -1,0 +1,1451 @@
+{
+ "tables": {
+  "address": {
+   "name": "address",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "country_iso",
+     "type": "char(2)",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "country_iso",
+     "unique": false,
+     "columns": [
+      "country_iso"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "catégorie_équipement": {
+   "name": "catégorie_équipement",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "libellé_très_long_accentué",
+     "type": "varchar(80)",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "数据库名称",
+     "type": "varchar(20)",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "child_mandatory": {
+   "name": "child_mandatory",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "parent_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "parent_id",
+     "unique": false,
+     "columns": [
+      "parent_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "child_optional": {
+   "name": "child_optional",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "parent_id",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "parent_id",
+     "unique": false,
+     "columns": [
+      "parent_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "circular_x": {
+   "name": "circular_x",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "y_id",
+     "type": "int",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "y_id",
+     "unique": false,
+     "columns": [
+      "y_id"
+     ]
+    }
+   ]
+  },
+  "circular_y": {
+   "name": "circular_y",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "x_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "x_id",
+     "unique": false,
+     "columns": [
+      "x_id"
+     ]
+    }
+   ]
+  },
+  "composite_child": {
+   "name": "composite_child",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "a",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "b",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "a",
+     "unique": false,
+     "columns": [
+      "a",
+      "b"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "composite_parent": {
+   "name": "composite_parent",
+   "comment": "",
+   "columns": [
+    {
+     "name": "a",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "b",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "label",
+     "type": "varchar(20)",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "a",
+      "b"
+     ]
+    }
+   ]
+  },
+  "country": {
+   "name": "country",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "iso",
+     "type": "char(2)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": true
+    },
+    {
+     "name": "label",
+     "type": "varchar(50)",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "iso",
+     "unique": true,
+     "columns": [
+      "iso"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub": {
+   "name": "hub",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_1": {
+   "name": "hub_ref_1",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_2": {
+   "name": "hub_ref_2",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_3": {
+   "name": "hub_ref_3",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_4": {
+   "name": "hub_ref_4",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_5": {
+   "name": "hub_ref_5",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_6": {
+   "name": "hub_ref_6",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_7": {
+   "name": "hub_ref_7",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_8": {
+   "name": "hub_ref_8",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "hub_ref_9": {
+   "name": "hub_ref_9",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "hub_id",
+     "type": "int",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "hub_id",
+     "unique": false,
+     "columns": [
+      "hub_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "isolated": {
+   "name": "isolated",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "note",
+     "type": "text",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "one_to_one_mandatory": {
+   "name": "one_to_one_mandatory",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "parent_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": true
+    }
+   ],
+   "indexes": [
+    {
+     "name": "parent_id",
+     "unique": true,
+     "columns": [
+      "parent_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "one_to_one_optional": {
+   "name": "one_to_one_optional",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "parent_id",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": true
+    }
+   ],
+   "indexes": [
+    {
+     "name": "parent_id",
+     "unique": true,
+     "columns": [
+      "parent_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "parent": {
+   "name": "parent",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "name",
+     "type": "varchar(50)",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "profile": {
+   "name": "profile",
+   "comment": "",
+   "columns": [
+    {
+     "name": "parent_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": true,
+     "fk": true,
+     "unique": false
+    },
+    {
+     "name": "bio",
+     "type": "text",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": false,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "parent_id"
+     ]
+    }
+   ]
+  },
+  "profile_photo": {
+   "name": "profile_photo",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "int",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "profile_id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    },
+    {
+     "name": "profile_id",
+     "unique": false,
+     "columns": [
+      "profile_id"
+     ]
+    }
+   ]
+  },
+  "self_ref": {
+   "name": "self_ref",
+   "comment": "",
+   "columns": [
+    {
+     "name": "id",
+     "type": "bigint unsigned",
+     "nullable": false,
+     "default": null,
+     "extra": "auto_increment",
+     "comment": "",
+     "pk": true,
+     "fk": false,
+     "unique": false
+    },
+    {
+     "name": "manager_id",
+     "type": "bigint unsigned",
+     "nullable": true,
+     "default": null,
+     "extra": "",
+     "comment": "",
+     "pk": false,
+     "fk": true,
+     "unique": false
+    }
+   ],
+   "indexes": [
+    {
+     "name": "manager_id",
+     "unique": false,
+     "columns": [
+      "manager_id"
+     ]
+    },
+    {
+     "name": "PRIMARY",
+     "unique": true,
+     "columns": [
+      "id"
+     ]
+    }
+   ]
+  }
+ },
+ "relations": [
+  {
+   "name": "address_ibfk_1",
+   "from": "address",
+   "to": "country",
+   "columns": [
+    "country_iso"
+   ],
+   "ref_columns": [
+    "iso"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "child_mandatory_ibfk_1",
+   "from": "child_mandatory",
+   "to": "parent",
+   "columns": [
+    "parent_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "child_optional_ibfk_1",
+   "from": "child_optional",
+   "to": "parent",
+   "columns": [
+    "parent_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "circular_x_ibfk_1",
+   "from": "circular_x",
+   "to": "circular_y",
+   "columns": [
+    "y_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "circular_y_ibfk_1",
+   "from": "circular_y",
+   "to": "circular_x",
+   "columns": [
+    "x_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "composite_child_ibfk_1",
+   "from": "composite_child",
+   "to": "composite_parent",
+   "columns": [
+    "a",
+    "b"
+   ],
+   "ref_columns": [
+    "a",
+    "b"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_1_ibfk_1",
+   "from": "hub_ref_1",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_2_ibfk_1",
+   "from": "hub_ref_2",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_3_ibfk_1",
+   "from": "hub_ref_3",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_4_ibfk_1",
+   "from": "hub_ref_4",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_5_ibfk_1",
+   "from": "hub_ref_5",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_6_ibfk_1",
+   "from": "hub_ref_6",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_7_ibfk_1",
+   "from": "hub_ref_7",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_8_ibfk_1",
+   "from": "hub_ref_8",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "hub_ref_9_ibfk_1",
+   "from": "hub_ref_9",
+   "to": "hub",
+   "columns": [
+    "hub_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "one_to_one_mandatory_ibfk_1",
+   "from": "one_to_one_mandatory",
+   "to": "parent",
+   "columns": [
+    "parent_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..1"
+  },
+  {
+   "name": "one_to_one_optional_ibfk_1",
+   "from": "one_to_one_optional",
+   "to": "parent",
+   "columns": [
+    "parent_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..1"
+  },
+  {
+   "name": "profile_ibfk_1",
+   "from": "profile",
+   "to": "parent",
+   "columns": [
+    "parent_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..1"
+  },
+  {
+   "name": "profile_photo_ibfk_1",
+   "from": "profile_photo",
+   "to": "profile",
+   "columns": [
+    "profile_id"
+   ],
+   "ref_columns": [
+    "parent_id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "1",
+   "card_child": "0..N"
+  },
+  {
+   "name": "self_ref_ibfk_1",
+   "from": "self_ref",
+   "to": "self_ref",
+   "columns": [
+    "manager_id"
+   ],
+   "ref_columns": [
+    "id"
+   ],
+   "on_update": "NO ACTION",
+   "on_delete": "NO ACTION",
+   "card_parent": "0..1",
+   "card_child": "0..N"
+  }
+ ],
+ "external_fks": [],
+ "source": {
+  "kind": "sql",
+  "name": "edge-cases.sql"
+ },
+ "groups": {}
+}

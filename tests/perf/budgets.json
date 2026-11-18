@@ -1,0 +1,8 @@
+{
+ "_regle": "budget = 2 x la mesure du runner GitHub ubuntu-latest (run 44292108805, 2026-11-18), minimum 10 s. Bloquant en CI (linux) seulement : sur un poste de travail, les temps varient du simple au double selon la charge (250 tables : 50 s puis 124 s le meme jour), les mesures y sont affichees sans budget. 25 tables : 1er test, inclut le demarrage a froid de Chrome. Recalibrer ici si le materiel CI change.",
+ "linux": {
+  "25": {"extract_s": 10, "build_s": 44, "html_kb": 480},
+  "100": {"extract_s": 10, "build_s": 20, "html_kb": 3000},
+  "250": {"extract_s": 10, "build_s": 91, "html_kb": 7520}
+ }
+}

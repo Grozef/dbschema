@@ -104,6 +104,8 @@ def cmd_patch(layout_path, src, dst):
         x = read('document.mwb.xml').decode('utf-8')
         others = [(it, read(it)) for it in zin.infolist() if it.filename != 'document.mwb.xml']
         doc_info = zin.getinfo('document.mwb.xml')
+    if re.search(r'<!(DOCTYPE|ENTITY)', x, re.I):  # jamais dans un document Workbench : entites XML (expansion, fichiers) refusees
+        sys.exit('ECHEC : document.mwb.xml contient une declaration DOCTYPE/ENTITY : refus')
     if x.count('struct-name="workbench.physical.Layer"') > 1:
         sys.exit('ECHEC : le modele a plusieurs calques (layers) ; les positions y sont relatives au calque. Non gere : refus.')
 
@@ -166,13 +168,14 @@ def cmd_patch(layout_path, src, dst):
         if v < n:
             out = out[:s] + '%g' % n + out[e:]
 
-    import xml.dom.minidom
-    xml.dom.minidom.parseString(out.encode('utf-8'))
+    import xml.dom.minidom  # nosec B408 : XML bien forme verifie, sans DOCTYPE ni ENTITY (refuses plus haut)
+    xml.dom.minidom.parseString(out.encode('utf-8'))  # nosec B318
     with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as zout:
         zout.writestr(doc_info, out.encode('utf-8'))
         for it, data in others:
             zout.writestr(it, data)
-    assert hashlib.sha256(open(src, 'rb').read()).hexdigest() == h0, 'la source a change !'
+    if hashlib.sha256(open(src, 'rb').read()).hexdigest() != h0:  # pas d'assert : retire par python -O
+        sys.exit('ECHEC : la source %s a change pendant le traitement' % src)
     absent = sorted(set(pos) - set(real))
     print(f'mwb : {dst} ({changed} tables placees, echelle x{rx:.3f} y{ry:.3f} sur les tailles Workbench, {nsplit} liens en split, '
           f'0 chevauchement{", absentes du modele : " + ", ".join(absent) if absent else ""}) ; source inchangee (sha256 {h0[:12]})')
