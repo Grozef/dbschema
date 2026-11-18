@@ -37,3 +37,16 @@ test('modele incoherent (relation vers une table absente) : echec, aucun livrabl
   assert.notEqual(r.status, 0);
   assert.ok(!fs.existsSync(path.join(dir, 'out', 'T.html')));
 });
+
+test('build avec navigateur : largeurs mesurees, debordement mesure, PNG ecrit (saute sans navigateur)', (t) => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'dbschema-build-'));
+  const env = { ...process.env };
+  if (env.DBSCHEMA_CHROME === 'none') delete env.DBSCHEMA_CHROME;
+  const r = spawnSync(process.execPath, [BUILD, path.join(FIX, 'edge.model.json'), out, 'T'], { encoding: 'utf8', env });
+  if (/ni Chrome, Edge ni Chromium/.test(r.stdout)) return t.skip('aucun navigateur sur ce poste');
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /\[texte\] largeurs mesurees dans Chrome/);
+  assert.match(r.stdout, /\[texte\] debordements mesures dans Chrome \(\d vues\) : 0 -> OK/);
+  const png = fs.readFileSync(path.join(out, 'T.png'));
+  assert.equal(png.subarray(1, 4).toString(), 'PNG');
+});

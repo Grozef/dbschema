@@ -29,7 +29,7 @@ Sources acceptées :
 
 Prérequis :
 - Node 18 ou plus ;
-- Python 3.9 ou plus (`python3` ou `python`) ;
+- Python 3.10 ou plus (`python3` ou `python`) ;
 - un serveur MySQL ou MariaDB (voir [Compatibilité](#compatibilité)), local pour `--sql` et `--laravel`, avec ses clients `mysql` et `mysqldump` (ou `mariadb` et `mariadb-dump`) ;
 - Chrome, Edge ou Chromium, pour le PNG et la mesure des textes (sans navigateur : HTML et SQL seulement) ;
 - bash : sous Windows, celui de Git for Windows ;
@@ -166,7 +166,7 @@ Sans serveur ou sans navigateur, les tests qui en dépendent sont sautés, et py
 
 GitHub Actions (`.github/workflows/`), à chaque push sur `dev` ou `main` et à chaque PR vers `main` :
 - `static` ;
-- `unit` : Linux, Windows et macOS, Python 3.9 et 3.13, Node 18 et 24 ; couverture JS de `lib/` (seuils : lignes 95 %, branches 85 %, fonctions 95 %) ;
+- `unit` : Linux, Windows et macOS, Python 3.10 et 3.13, Node 18 et 24 ; couverture JS de `lib/` (seuils : lignes 95 %, branches 85 %, fonctions 95 %) ;
 - `db` : MySQL 8.4, MySQL 5.7 et MariaDB 11.4, toute la suite hors perf ; couverture Python de `lib/` (seuil 90 %) ;
 - `render` : PNG sous Windows et macOS ;
 - `perf` ;

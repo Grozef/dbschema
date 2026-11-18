@@ -9,12 +9,12 @@
 set -euo pipefail
 SKILL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 die() { echo "dbschema: $*" >&2; exit 2; }
-# python3 s'il tourne vraiment (sous Windows, python3 est souvent le raccourci du Microsoft Store), sinon python ; 3.9 minimum
+# python3 s'il tourne vraiment (sous Windows, python3 est souvent le raccourci du Microsoft Store), sinon python ; 3.10 minimum (3.9 en fin de vie, et pytest corrige exige 3.10)
 PY=()
 for p in python3 python; do
-  if "$p" -c 'import sys; sys.exit(sys.version_info < (3, 9))' >/dev/null 2>&1; then PY=("$p" -I); break; fi
+  if "$p" -c 'import sys; sys.exit(sys.version_info < (3, 10))' >/dev/null 2>&1; then PY=("$p" -I); break; fi
 done
-[ ${#PY[@]} -gt 0 ] || die "Python 3.9+ introuvable (python3 ou python)"
+[ ${#PY[@]} -gt 0 ] || die "Python 3.10+ introuvable (python3 ou python)"
 
 cmd="${1:-}"; shift || true
 case "$cmd" in

@@ -27,7 +27,8 @@ def test_erreur_mysql_lisible_sans_trace(db, tmp_path):
     p = tmp_path / 'faute.sql'
     p.write_text('CREATE TABLE t (id INT;', encoding='utf-8')
     code, out = extract_cli('--sql', str(p), '--out', str(tmp_path / 'm.json'))
-    assert code != 0 and 'erreur : ERROR 1064' in out and '1064' in out and 'Traceback' not in out, out[-500:]
+    # le client MariaDB recopie l'instruction fautive avant "ERROR 1064" : on exige le prefixe et le code, pas leur contiguite
+    assert code != 0 and 'erreur : ' in out and 'ERROR 1064' in out and 'Traceback' not in out, out[-500:]
 
 
 def test_db_avec_compte_en_select_seul(db, tmp_path):
