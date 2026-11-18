@@ -13,6 +13,7 @@ du layout sont mises a l'echelle par le rapport max (taille Workbench / taille d
 import hashlib, json, os, re, sys, zipfile
 
 MARGIN = 40
+MAX_UNZIPPED = 500 * 2 ** 20  # 500 Mo decompresses au total (bombe de decompression)
 
 
 def load(p):
@@ -90,7 +91,7 @@ def cmd_patch(layout_path, src, dst):
     box, hubs = boxes(lay), set(lay.get('hubs', []))
     h0 = hashlib.sha256(open(src, 'rb').read()).hexdigest()
     with zipfile.ZipFile(src) as zin:
-        budget = [500 * 2 ** 20]  # 500 Mo decompresses au total, compte en lisant (la taille declaree est falsifiable)
+        budget = [MAX_UNZIPPED]  # compte en lisant : la taille declaree dans le zip est falsifiable
 
         def read(member):
             out = []
@@ -131,6 +132,9 @@ def cmd_patch(layout_path, src, dst):
     for s, e, name in spans:
         g = lambda k: float(re.search(r'key="%s">([-\d.e]+)<' % k, x[s:e]).group(1))
         real[name] = (g('width'), g('height'))
+    if not set(real) & set(box):
+        sys.exit('ECHEC : aucune table du schema dans ce modele Workbench (%d table(s) dans le modele) : mauvais fichier --mwb ?'
+                 % len(real))
     pos, rx, ry = scaled(box, real)
 
     out, changed = x, 0
