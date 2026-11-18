@@ -9,6 +9,12 @@ import { interactivePage, staticPage } from '../../lib/render.mjs';
 import { mini } from './helpers.mjs';
 
 const EVIL_T = '<img src=x onerror=alert(1)>', EVIL_C = '"><svg onload=alert(2)>', EVIL_S = '</script><script>alert(3)</script>';
+// contenu entre une balise ouvrante exacte et la fermeture qui suit (sans regex HTML : CodeQL js/bad-tag-filter)
+const between = (html, open, close = '</script>') => {
+  const a = html.indexOf(open);
+  assert.ok(a >= 0, 'balise absente : ' + open);
+  return html.slice(a + open.length, html.indexOf(close, a + open.length));
+};
 
 async function evil() {
   const m = mini({ [EVIL_T]: [EVIL_C], child: ['p_id'] }, [['child', 'p_id', EVIL_T, 'id']], { ['G<b>' + EVIL_S]: [EVIL_T] });
@@ -41,7 +47,7 @@ test("CSP : script autorise par son empreinte, pas de 'unsafe-inline' pour les s
   const csp = html.match(/Content-Security-Policy" content="([^"]+)"/)[1];
   const scriptSrc = csp.split(';').map((d) => d.trim()).find((d) => d.startsWith('script-src'));
   assert.ok(!scriptSrc.includes('unsafe-inline'), scriptSrc);
-  const code = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const code = between(html, '<script>');
   const sha = 'sha256-' + createHash('sha256').update(code, 'utf8').digest('base64');
   assert.equal(scriptSrc, `script-src '${sha}'`);
   // le navigateur calcule l'empreinte APRES normalisation CRLF -> LF : le texte insere ne doit contenir aucun CR
@@ -56,7 +62,7 @@ test('page interactive : 1 script executable + 1 bloc de donnees, jamais referme
   assert.equal((html.match(/<\/script/gi) || []).length, 2);
   assert.ok(!html.includes('alert(3)</script>'));
   // les donnees embarquees se relisent a l'identique (JSON.parse du bloc application/json dans la page)
-  const raw = html.match(/<script type="application\/json" id="dbschema-data">([\s\S]*?)<\/script>/)[1];
+  const raw = between(html, '<script type="application/json" id="dbschema-data">');
   assert.ok(!raw.includes('<'));
   const D = JSON.parse(raw);
   assert.ok(Object.hasOwn(D.tables, EVIL_T));
