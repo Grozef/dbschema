@@ -98,6 +98,12 @@ for (const col of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
   }
 }
 
+test('colonnes au nom numerique (2, 10) : ordre des lignes conserve, controles OK (N3, revue du 2026-11-18)', async () => {
+  const lay = await layout(mini({ p: [], c: ['note', '10', '2'] }, [['c', '2', 'p', 'id']]));
+  assert.deepEqual(lay.tables.c.rows, ['id', 'note', '10', '2']);
+  ok(lay);
+});
+
 test('ENUM tres long : type affiche tronque, carte de largeur bornee (revue du 2026-11-18)', async () => {
   const m = mini({ t: ['etat'] });
   m.tables.t.columns[1].type = 'enum(' + Array.from({ length: 40 }, (_, i) => `'valeur_numero_${i}'`).join(',') + ')';

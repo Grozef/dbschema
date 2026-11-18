@@ -199,8 +199,9 @@ ALLOWED = re.compile(r'(CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE|CREATE\s+(UNIQ
 # tables qui lisent ou ecrivent HORS de la base jetable : moteurs relais (autre serveur, fichiers), chemins de stockage.
 # Teste sur le texte NETTOYE (chaines -> '' ou "") : un moteur ecrit en chaine (ENGINE='FEDERATED') ou entre backticks est
 # refuse d'office ; CONNECTION refuse avec ou sans = (grammaire : CONNECTION [=] 'texte'). Releve par la relecture du 2026-11-18.
-# (?<![@.]) : @engine, @connection (variables) et t.engine ne sont pas des options de table
-STORAGE_BAD = re.compile(r"(?<![@.])\bENGINE\s*=?\s*(`?(FEDERATED|FEDERATEDX|CONNECT|SPIDER|S3|OQGRAPH)\b|''|\"\")|"
+# (?<![@.]) : @engine, @connection (variables) et t.engine ne sont pas des options de table.
+# _utf8mb4'...', N'...' et ` FEDERATED` : refuses par MySQL 8.4 (2026-11-18), MariaDB non verifie -> refuses ici aussi
+STORAGE_BAD = re.compile(r"(?<![@.])\bENGINE\s*=?\s*(`?\s*(FEDERATED|FEDERATEDX|CONNECT|SPIDER|S3|OQGRAPH)\b|(_\w+\s*|N)?(''|\"\"))|"
                          r"(?<![@.])\bCONNECTION\s*(=|''|\"\")|\b(DATA|INDEX)\s+DIRECTORY\b|\bFILE_NAME\s*=", re.I)
 ID = r'[\w$\u0080-￿]'
 # nom qualifie base.table : identifiant (avec au moins un caractere non numerique, pour ne pas prendre 1.5) ou `...` ou "..."
