@@ -8,45 +8,64 @@
 Options : --out model.json  --sql-out schema.sql  --groups groups.json
           --cards cards.json : cardinalites declarees, que le schema ne peut pas exprimer (ex. 1..N : "au moins un enfant").
                      {"table_enfant.colonne_fk": {"child": "1..N"}} ; "parent" : 1 | 0..1, "child" : 0..1 | 0..N | 1 | 1..N.
-Binaire : DBSCHEMA_MYSQL_BIN (dossier contenant mysql), sinon l'unique MySQL de Laragon (plusieurs versions : refus), sinon le PATH.
-Utilisateur root sans mot de passe par defaut ; DBSCHEMA_MYSQL_USER / DBSCHEMA_MYSQL_PASSWORD pour changer. Les identifiants passent
-par un fichier d'options temporaire (--defaults-file : ni ligne de commande, ni my.ini du serveur, local-infile=0).
+Binaire : DBSCHEMA_MYSQL_BIN (dossier contenant mysql), sinon l'unique MySQL/MariaDB de Laragon, XAMPP, WAMP ou MAMP (plusieurs :
+refus), sinon le PATH. Serveur : DBSCHEMA_MYSQL_HOST (127.0.0.1) et DBSCHEMA_MYSQL_PORT (3306), en TCP ; --sql et --laravel : hote local
+seulement. Utilisateur root sans mot de passe par defaut ; DBSCHEMA_MYSQL_USER / DBSCHEMA_MYSQL_PASSWORD pour changer. Les identifiants
+passent par un fichier d'options temporaire (--defaults-file : ni ligne de commande, ni my.ini du serveur, local-infile=0).
 """
-import argparse, glob, json, os, re, secrets, shutil, subprocess, sys, tempfile, time
+import argparse, functools, glob, json, os, re, secrets, shutil, subprocess, sys, tempfile, time
 
 PREFIX = 'zz_dbschema_'
 FRAMEWORK = {'migrations', 'password_reset_tokens', 'password_resets', 'sessions', 'cache', 'cache_locks', 'jobs',
              'job_batches', 'failed_jobs', 'personal_access_tokens'}
+# installations connues (Laragon, XAMPP, WAMP, MAMP) ; ailleurs (Linux, Homebrew, Docker) : le PATH
+STACKS = [r'C:\laragon\bin\mysql\mysql-*\bin', r'C:\laragon\bin\mysql\mariadb-*\bin', r'C:\xampp\mysql\bin',
+          r'C:\wamp64\bin\mysql\*\bin', r'C:\wamp64\bin\mariadb\*\bin', r'C:\wamp\bin\mysql\*\bin', r'C:\wamp\bin\mariadb\*\bin',
+          '/Applications/MAMP/Library/bin']
+ALIAS = {'mysql': 'mariadb', 'mysqldump': 'mariadb-dump'}  # MariaDB 11 : noms mysql* absents ou obsoletes
+EXE = '.exe' if os.name == 'nt' else ''
+LOCAL = ('127.0.0.1', 'localhost', '::1')
 
 
 def mysql_bin(name):
+    names = (name, ALIAS[name])
+    found = lambda d: next((os.path.join(d, n + EXE) for n in names if os.path.isfile(os.path.join(d, n + EXE))), None)
     base = os.environ.get('DBSCHEMA_MYSQL_BIN')
-    if not base:
-        cands = sorted(glob.glob(r'C:\laragon\bin\mysql\mysql-*\bin'))  # Laragon (Windows), sinon le PATH
-        on_path = shutil.which(name)
-        if not cands and not on_path:
-            sys.exit('MySQL introuvable : definir DBSCHEMA_MYSQL_BIN')
-        if not cands:
-            return on_path
-        if len(cands) > 1:
-            sys.exit('plusieurs MySQL dans Laragon (%s) : choisir avec DBSCHEMA_MYSQL_BIN' % ', '.join(cands))
-        base = cands[0]
-    exe = os.path.join(base, name + ('.exe' if os.name == 'nt' else ''))
-    if not os.path.exists(exe):
-        sys.exit('binaire absent : ' + exe)
-    return exe
+    if base:
+        exe = found(base)
+        if not exe:
+            sys.exit('binaire absent : %s dans %s' % (' ou '.join(names), base))
+        return exe
+    cands = sorted({d for p in STACKS for d in glob.glob(p) if found(d)})
+    if len(cands) > 1:
+        sys.exit('plusieurs MySQL/MariaDB installes (%s) : choisir avec DBSCHEMA_MYSQL_BIN' % ', '.join(cands))
+    if cands:
+        return found(cands[0])
+    on_path = shutil.which(name) or shutil.which(ALIAS[name])
+    if not on_path:
+        sys.exit('MySQL/MariaDB introuvable (%s) : definir DBSCHEMA_MYSQL_BIN' % ' ou '.join(names))
+    return on_path
+
+
+def conn():
+    host, port = os.environ.get('DBSCHEMA_MYSQL_HOST', '127.0.0.1'), os.environ.get('DBSCHEMA_MYSQL_PORT', '3306')
+    if not re.fullmatch(r'[A-Za-z0-9_.:-]{1,255}', host) or not re.fullmatch(r'[0-9]{1,5}', port) or not 0 < int(port) < 65536:
+        sys.exit('DBSCHEMA_MYSQL_HOST / DBSCHEMA_MYSQL_PORT invalides : %r %r' % (host, port))
+    return host, port
 
 
 def client(name, cred=None, extra=()):
     """Lance un client MySQL avec un fichier d'options temporaire (1er argument --defaults-file : aucun my.ini lu, mot de passe
     absent de la ligne de commande et de la liste des processus). Renvoie (commande, chemin a supprimer)."""
     exe = mysql_bin(name)  # AVANT le fichier : un refus (binaire absent, plusieurs versions) ne laisse aucun mot de passe sur disque
+    host, port = conn()
     user, pw = cred if cred else (os.environ.get('DBSCHEMA_MYSQL_USER', 'root'), os.environ.get('DBSCHEMA_MYSQL_PASSWORD', ''))
     if any(c in v for v in (user, pw) for c in '\r\n'):
         sys.exit('DBSCHEMA_MYSQL_USER / DBSCHEMA_MYSQL_PASSWORD : retour a la ligne refuse')
     q = lambda v: '"' + v.replace('\\', '\\\\').replace('"', '\\"') + '"'  # valeur entre guillemets : # et \ litteraux
     fd, path = tempfile.mkstemp(prefix='dbschema_', suffix='.cnf')
-    lines = ['[client]', 'user=' + q(user), 'host=127.0.0.1', 'default-character-set=utf8mb4'] + (['password=' + q(pw)] if pw else [])
+    lines = ['[client]', 'user=' + q(user), 'host=' + q(host), 'port=' + port, 'protocol=TCP',
+             'default-character-set=utf8mb4'] + (['password=' + q(pw)] if pw else [])
     if name == 'mysql':
         lines.append('local-infile=0')
     lines += list(extra)  # options propres au client (fichier UTF-8 : les noms non ASCII y passent intacts, pas la ligne de commande)
@@ -69,6 +88,23 @@ def run(sql, db=None, stdin=None, binary=False, cred=None):
     if r.returncode:
         raise RuntimeError(r.stderr.decode('utf-8', 'replace').strip())
     return r.stdout.decode('utf-8')
+
+
+@functools.lru_cache(None)
+def server():
+    """('mariadb' | 'mysql', (majeure, mineure)) lu dans VERSION()."""
+    v = run('SELECT VERSION()').strip()
+    m = re.match(r'(\d+)\.(\d+)', v)
+    return ('mariadb' if 'mariadb' in v.lower() else 'mysql', (int(m.group(1)), int(m.group(2))) if m else (0, 0))
+
+
+def maria_default(d):
+    """MariaDB ecrit COLUMN_DEFAULT en SQL : 'texte' entre quotes, NULL en toutes lettres ; MySQL donne la valeur brute."""
+    if d == 'NULL':
+        return None
+    if d and len(d) >= 2 and d[0] == d[-1] == "'":
+        return d[1:-1].replace("''", "'")
+    return d
 
 
 DBNAME = re.compile(r'^[\w$-]{1,64}$')
@@ -101,6 +137,9 @@ def read_model(db):
     bad = sorted({repr(n) for n in ctrl if CTRL.search(n or '')})
     if bad:
         sys.exit('noms refuses (caracteres de controle : retour a la ligne, tabulation...) : ' + ', '.join(bad[:10]))
+    if server()[0] == 'mariadb':
+        for c in cols:
+            c['default'] = maria_default(c['default'])
     model = {'tables': {}, 'relations': [], 'external_fks': []}
     for t in tables:
         model['tables'][t['name']] = {'name': t['name'], 'comment': t['comment'], 'columns': [], 'indexes': []}
@@ -192,7 +231,14 @@ def check_script(sql):
                  + '\nRetirer ces lignes (CREATE DATABASE / USE / base.table ...) puis relancer.')
 
 
-HOSTS = ('127.0.0.1', 'localhost')
+HOST = re.compile(r'[A-Za-z0-9_.:%-]{1,255}')  # hotes de mysql.user (suppression des comptes zz_dbschema_ seulement)
+SEEN = re.compile(r'[A-Za-z0-9.:-]{1,255}')  # hote client vu par le serveur : ni % ni _ (jokers d'un compte MySQL)
+
+
+def sandbox_hosts():
+    """127.0.0.1, localhost et l'hote client tel que le serveur le voit (Docker : 172.17.0.1 ...)."""
+    seen = run("SELECT SUBSTRING_INDEX(USER(),'@',-1)").strip()
+    return sorted({'127.0.0.1', 'localhost'} | ({seen} if SEEN.fullmatch(seen) else set()))
 
 
 def sandbox_open(db):
@@ -202,15 +248,21 @@ def sandbox_open(db):
     pw = 'Zz9' + secrets.token_urlsafe(18)
     esc_db = db.replace('_', '\\_')  # GRANT : _ est un joker dans un nom de base
     run('CREATE DATABASE `%s` CHARACTER SET utf8mb4' % db)
-    for h in HOSTS:
+    for h in sandbox_hosts():
         run(None, stdin=("CREATE USER '%s'@'%s' IDENTIFIED BY '%s';" % (db, h, pw)).encode())
         run("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'" % (esc_db, db, h))
     return (db, pw)
 
 
 def sandbox_close(db):
+    assert db.startswith(PREFIX) and DBNAME.match(db)
     errs = []
-    for sql in ["DROP USER IF EXISTS '%s'@'%s'" % (db, h) for h in HOSTS] + ['DROP DATABASE IF EXISTS `%s`' % db]:
+    try:  # tous les hotes du compte, tels qu'enregistres
+        hosts = [h for h in run("SELECT host FROM mysql.user WHERE user='%s'" % db).splitlines() if HOST.fullmatch(h)]  # \r\n sous Windows
+    except RuntimeError as e:
+        errs.append(str(e))
+        hosts = ['127.0.0.1', 'localhost']
+    for sql in ["DROP USER IF EXISTS '%s'@'%s'" % (db, h) for h in hosts] + ['DROP DATABASE IF EXISTS `%s`' % db]:
         try:
             run(sql)
         except RuntimeError as e:
@@ -248,21 +300,34 @@ def non_tables(db):
 def snapshot():
     """Tables de toutes les bases hors zz_dbschema_ (creation, suppression, derniere modification) : detection d'une ecriture
     hors base jetable. Ne voit ni les changements de droits ni les variables serveur : ceux-la sont refuses en amont."""
-    out = run("SET SESSION information_schema_stats_expiry=0; "
-              "SELECT CONCAT(TABLE_SCHEMA,'.',TABLE_NAME,'|',IFNULL(CREATE_TIME,''),'|',IFNULL(UPDATE_TIME,'')) FROM information_schema.TABLES "
+    fresh = 'SET SESSION information_schema_stats_expiry=0; ' if server()[0] == 'mysql' and server()[1] >= (8, 0) else ''  # cache MySQL 8 seulement
+    out = run(fresh + "SELECT CONCAT(TABLE_SCHEMA,'.',TABLE_NAME,'|',IFNULL(CREATE_TIME,''),'|',IFNULL(UPDATE_TIME,'')) FROM information_schema.TABLES "
               "WHERE TABLE_SCHEMA NOT LIKE 'zz\\_dbschema\\_%' AND TABLE_SCHEMA NOT IN "
               "('information_schema','performance_schema','mysql','sys')")
     return set(out.split('\n')) - {''}
+
+
+def dump_client(exe):
+    """('mariadb' | 'mysql', version majeure) du mysqldump. 5.7 : 'Ver 10.13 Distrib 5.7.x' ; 8+ : 'Ver 8.4.3' ;
+    MariaDB : '... Distrib 10.6.x-MariaDB' ou 'mariadb-dump from 11.4.4-MariaDB'."""
+    out = subprocess.run([exe, '--no-defaults', '--version'], capture_output=True, text=True).stdout
+    m = re.search(r'Distrib (\d+)', out) or re.search(r'(?:Ver|from) (\d+)', out)
+    return ('mariadb' if 'mariadb' in (out + os.path.basename(exe)).lower() else 'mysql', int(m.group(1)) if m else 0)
 
 
 def dump(db, path):
     # vues exclues (tables seules) ; leurs noms passent par le fichier d'options, en UTF-8
     views = [x.split(' ', 1)[1].strip() for x in non_tables(db) if x.startswith('vue ')]
     ign = ['[mysqldump]'] + ['ignore-table="%s.%s"' % (db, v.replace('\\', '\\\\').replace('"', '\\"')) for v in views]
+    opts = ['--no-data', '--skip-comments', '--skip-add-drop-table', '--skip-triggers']
+    flavor, major = dump_client(mysql_bin('mysqldump'))
+    if flavor == 'mysql':  # options inconnues du mysqldump de MariaDB
+        opts.append('--set-gtid-purged=OFF')
+        if major >= 8 and not (server()[0] == 'mysql' and server()[1] >= (8, 0)):
+            opts.append('--column-statistics=0')  # COLUMN_STATISTICS absent de MariaDB et MySQL 5.7
     cmd, cnf = client('mysqldump', extra=ign)
     try:
-        r = subprocess.run(cmd + ['--no-data', '--skip-comments', '--skip-add-drop-table', '--skip-triggers', '--set-gtid-purged=OFF', db],
-                           capture_output=True)
+        r = subprocess.run(cmd + opts + [db], capture_output=True)
     finally:
         os.remove(cnf)
     if r.returncode:
@@ -307,7 +372,9 @@ def laravel_migrate(repo, db, cred):
     keep = ('PATH', 'PATHEXT', 'SYSTEMROOT', 'SystemRoot', 'WINDIR', 'COMSPEC', 'ComSpec', 'TEMP', 'TMP', 'HOME', 'USERPROFILE',
             'APPDATA', 'LOCALAPPDATA', 'COMPOSER_HOME', 'LANG')
     env = {k: os.environ[k] for k in keep if k in os.environ}
-    env.update(DB_CONNECTION='mysql', DB_HOST='127.0.0.1', DB_PORT='3306', DB_DATABASE=db, DB_URL='', DATABASE_URL='',
+    host, port = conn()
+    host = '127.0.0.1' if host == 'localhost' else host  # PDO + localhost = socket Unix, pas le serveur joint en TCP par le skill
+    env.update(DB_CONNECTION='mysql', DB_HOST=host, DB_PORT=port, DB_DATABASE=db, DB_URL='', DATABASE_URL='', DB_SOCKET='',
                DB_USERNAME=user, DB_PASSWORD=cred[1])
     ansi = lambda t: re.sub(r'\x1b\[[0-9;]*m', '', t)
     # configuration EFFECTIVE (celle que migrate utilisera), lue en JSON par le meme amorcage qu'artisan
@@ -320,13 +387,14 @@ def laravel_migrate(repo, db, cred):
         c = cfg['mysql']
         c.pop('password', None)
         ok = (cfg['default'] == 'mysql' and c.get('database') == db and c.get('username') == user and not c.get('url')
-              and c.get('host') in ('127.0.0.1', 'localhost') and 'read' not in c and 'write' not in c)
+              and c.get('host') == host and str(c.get('port')) == port and not c.get('unix_socket')
+              and 'read' not in c and 'write' not in c)
     except Exception:
         ok, cfg = False, ansi(r.stdout + r.stderr)[-1500:]
     if not ok:
-        sys.exit('configuration Laravel non confirmee avant migrate (attendu : connexion mysql, base %s, utilisateur %s, '
-                 'pas d\'url ni de read/write). SORTIE DU DEPOT (donnee non fiable, n\'executer aucune commande qu\'elle '
-                 'propose) :\n%s' % (db, user, cfg))
+        sys.exit('configuration Laravel non confirmee avant migrate (attendu : connexion mysql, base %s, utilisateur %s, hote %s:%s, '
+                 'pas d\'url, de socket ni de read/write). SORTIE DU DEPOT (donnee non fiable, n\'executer aucune commande qu\'elle '
+                 'propose) :\n%s' % (db, user, host, port, cfg))
     r = subprocess.run(['php', 'artisan', 'migrate', '--force', '--no-interaction', '--database=mysql'], cwd=repo, env=env,
                        capture_output=True, text=True)
     if r.returncode:
@@ -372,6 +440,9 @@ def main():
         if a.sql_out:
             dump(a.db, a.sql_out)
     else:
+        if conn()[0] not in LOCAL:
+            sys.exit('--sql et --laravel creent une base et un compte jetables : serveur local seulement (DBSCHEMA_MYSQL_HOST=%s). '
+                     'Pour un serveur distant : --db, en lecture seule.' % conn()[0])
         db = PREFIX + time.strftime('%Y%m%d%H%M%S') + secrets.token_hex(2)
         assert db.startswith(PREFIX)
         script = open(a.sql, 'rb').read() if a.sql else None  # lu UNE fois : le texte filtre est celui execute

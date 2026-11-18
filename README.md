@@ -1,6 +1,6 @@
 # dbschema
 
-Skill [Claude Code](https://docs.claude.com/en/docs/claude-code) qui dessine le schéma d'une base MySQL dans le style de MySQL Workbench, mais avec une vraie mise en page :
+Skill [Claude Code](https://docs.claude.com/en/docs/claude-code) qui dessine le schéma d'une base MySQL ou MariaDB dans le style de MySQL Workbench, mais avec une vraie mise en page :
 - les tables sont séparées ;
 - les liens sont orthogonaux, partent de la colonne FK et arrivent sur la colonne référencée ;
 - les cardinalités sont en pattes d'oie avec leur texte (`1`, `0..1`, `0..N`, `1..N`) ;
@@ -23,15 +23,16 @@ Exemple interactif : [`examples/librairie.html`](examples/librairie.html) (à t�
 Sources acceptées :
 - un script SQL (`--sql`) ;
 - les migrations d'un projet Laravel (`--laravel`) ;
-- une base MySQL existante, en lecture seule (`--db`).
+- une base MySQL ou MariaDB existante, en lecture seule (`--db`), éventuellement distante. C'est la voie pour tous les autres frameworks : voir [Autres frameworks](#autres-frameworks).
 
 ## Installation
 
 Prérequis :
 - Node 18 ou plus ;
-- Python 3.10 ou plus ;
-- un serveur MySQL 8 local, avec ses clients `mysql` et `mysqldump` ;
-- Google Chrome ou Edge, pour le PNG et la mesure des textes ;
+- Python 3.9 ou plus (`python3` ou `python`) ;
+- un serveur MySQL ou MariaDB (voir [Compatibilité](#compatibilité)), local pour `--sql` et `--laravel`, avec ses clients `mysql` et `mysqldump` (ou `mariadb` et `mariadb-dump`) ;
+- Chrome, Edge ou Chromium, pour le PNG et la mesure des textes (sans navigateur : HTML et SQL seulement) ;
+- bash : sous Windows, celui de Git for Windows ;
 - Playwright pour Python, seulement pour les tests d'interface.
 
 ```bash
@@ -43,10 +44,35 @@ Variables d'environnement facultatives :
 
 | Variable | Rôle | Défaut |
 |---|---|---|
-| `DBSCHEMA_MYSQL_BIN` | Dossier qui contient `mysql` | Laragon, sinon le `PATH` |
-| `DBSCHEMA_MYSQL_USER` | Utilisateur MySQL | `root` |
-| `DBSCHEMA_MYSQL_PASSWORD` | Mot de passe MySQL | aucun |
-| `DBSCHEMA_CHROME` | Chemin du navigateur | Chrome ou Edge détecté |
+| `DBSCHEMA_MYSQL_BIN` | Dossier qui contient `mysql` ou `mariadb` | l'unique installation Laragon, XAMPP, WAMP ou MAMP trouvée, sinon le `PATH` |
+| `DBSCHEMA_MYSQL_HOST` | Hôte du serveur (TCP) | `127.0.0.1` |
+| `DBSCHEMA_MYSQL_PORT` | Port du serveur | `3306` |
+| `DBSCHEMA_MYSQL_USER` | Utilisateur | `root` |
+| `DBSCHEMA_MYSQL_PASSWORD` | Mot de passe | aucun |
+| `DBSCHEMA_CHROME` | Chemin du navigateur | Chrome, Edge ou Chromium détecté |
+
+### Selon votre installation
+
+| Installation | Réglage |
+|---|---|
+| Laragon, XAMPP, WAMP, MAMP | Aucun si une seule version de MySQL ou MariaDB est installée. Sinon : `DBSCHEMA_MYSQL_BIN` vers le dossier `bin` voulu (ex. `C:\wamp64\bin\mariadb\mariadb11.4.4\bin`). Port ou mot de passe différents (MAMP par exemple) : `DBSCHEMA_MYSQL_PORT`, `DBSCHEMA_MYSQL_PASSWORD`. |
+| Linux (apt, dnf), macOS (Homebrew) | Clients dans le `PATH`. Le `root` de MySQL ou MariaDB installé par paquet se connecte souvent par socket seulement : créer un utilisateur avec mot de passe, puis `DBSCHEMA_MYSQL_USER` et `DBSCHEMA_MYSQL_PASSWORD`. |
+| Docker | Publier le port sur la machine (`-p 127.0.0.1:3307:3306`), puis `DBSCHEMA_MYSQL_PORT=3307` et `DBSCHEMA_MYSQL_PASSWORD`. Les clients `mysql` et `mysqldump` doivent être installés sur la machine. |
+| Serveur distant | `--db` seulement (lecture seule), avec `DBSCHEMA_MYSQL_HOST`. `--sql` et `--laravel` sont refusés : ils créeraient une base et un compte sur ce serveur. Le contrôle porte sur `DBSCHEMA_MYSQL_HOST` : un tunnel (SSH, `port-forward`) vers un serveur distant sur `127.0.0.1` n'est pas détecté, ne l'utilisez pas avec `--sql`. |
+
+La connexion se fait toujours en TCP : un `localhost` ne passe pas par le socket.
+
+### Compatibilité
+
+Ce que la suite de tests prouve (`tests/compat_test.py`, conteneurs Docker jetables) :
+
+| Serveur | Client | Système | Résultat |
+|---|---|---|---|
+| MySQL 8.4 (Laragon) | MySQL 8.4 | Windows 11 | suite complète |
+| MySQL 8.4, MySQL 5.7, MariaDB 11.4 (Docker) | MySQL 8.4 | Windows 11 | suite complète |
+| MariaDB 11.4 (Docker) | MariaDB (Debian 12) | Linux, sans navigateur | HTML, SQL, 5 vues contrôlées, sans PNG |
+
+XAMPP, WAMP et MAMP ne sont pas testés sur une vraie installation : seule la recherche de leurs binaires l'est, sur une arborescence factice. macOS n'est pas testé.
 
 ## Utilisation
 
@@ -61,6 +87,24 @@ Options :
 - `--groups` : `{"DOMAINE": ["table", ...]}`. Chaque domaine a sa couleur et apparaît dans la légende ; `--frames` ajoute une vue où chaque domaine est encadré.
 - `--cards` : cardinalités que le schéma ne peut pas exprimer, par exemple `{"orders.customer_id": {"child": "1..N"}}`.
 - `--hub K` : une table référencée par plus de K clés étrangères (8 par défaut) a ses liens dessinés en amorces étiquetées (`→ users`). C'est l'équivalent du *split* de Workbench.
+
+## Autres frameworks
+
+Pour Symfony, Django, Rails, Prisma ou tout autre outil de migrations, lancez vos migrations sur votre base de développement comme d'habitude, puis lisez-la avec `--db`. Le skill n'exécute alors aucun code du projet.
+
+| Framework | Migrations |
+|---|---|
+| Symfony / Doctrine | `php bin/console doctrine:migrations:migrate` |
+| Django | `python manage.py migrate` |
+| Ruby on Rails | `bin/rails db:migrate` |
+| Prisma | `npx prisma migrate deploy` |
+| Laravel (sans `--trust-repo`) | `php artisan migrate` |
+
+```bash
+bash ~/.claude/skills/dbschema/dbschema.sh all --db ma_base_dev --out sortie --name MON_SCHEMA
+```
+
+Les tables techniques du framework (`doctrine_migration_versions`, `django_migrations`, `schema_migrations`, `_prisma_migrations`...) apparaissent alors dans le schéma. Autre voie : un export de structure (phpMyAdmin, Adminer, `mysqldump --no-data`) passé à `--sql`.
 
 ## Sécurité
 
@@ -96,6 +140,7 @@ Chaque vue passe des contrôles bloquants avant d'être livrée :
 bash dbschema.sh test
 python tests/ui_test.py <fichier.html> <dossier_captures>
 python tests/overflow_test.py <fichier.html>
+python tests/compat_test.py <dossier_temporaire>   # Docker requis : MariaDB 11.4, MySQL 5.7, MySQL 8.4, Linux
 ```
 
 La suite couvre :
