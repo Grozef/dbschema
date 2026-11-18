@@ -1,0 +1,6 @@
+{
+ "_regle": "budget = 2 x la mesure de reference (runner GitHub ubuntu-latest), arrondi au-dessus. Recalibrer ici si le materiel CI change.",
+ "25": {"extract_s": 20, "build_s": 30, "html_kb": 600},
+ "100": {"extract_s": 40, "build_s": 60, "html_kb": 2500},
+ "250": {"extract_s": 90, "build_s": 240, "html_kb": 7000}
+}
