@@ -51,6 +51,48 @@ def test_laravel_motifs_suspects_refuses(tmp_path):
     assert len(extract.foreign_connections(str(tmp_path))) == 10
 
 
+def test_laravel_source_du_framework_ignoree(tmp_path):
+    # Laravel neuf sous Windows (2026-11-27) : glob insensible a la casse prenait le code du Migrator
+    # (src/Illuminate/Database/Migrations/) pour des migrations et refusait --laravel
+    src = tmp_path / 'vendor' / 'laravel' / 'framework' / 'src' / 'Illuminate' / 'Database' / 'Migrations'
+    src.mkdir(parents=True)
+    (src / 'Migrator.php').write_text("<?php class Migrator { public function getConnection() {} }")
+    assert extract.foreign_connections(str(tmp_path)) == []
+
+
+def test_laravel_dossier_migrations_de_paquet_toute_casse(tmp_path):
+    # loadMigrationsFrom(__DIR__.'/Migrations') : Laravel execute ces fichiers, quel que soit l'OS
+    for d, f in [('database/Migrations', 'c.php'), ('src/Database/Migrations', 'd.PHP')]:
+        p = tmp_path / 'vendor' / 'pkg' / d
+        p.mkdir(parents=True)
+        (p / f).write_text("<?php Schema::connection('legacy')->create('t');")
+    bad = extract.foreign_connections(str(tmp_path))
+    assert len(bad) == 2 and any('c.php' in b for b in bad) and any('d.PHP' in b for b in bad)
+
+
+@pytest.mark.parametrize('d', ['laravel/framework/evil/migrations', 'laravel/telescope/database/migrations'])
+def test_laravel_exclusion_bornee_au_code_illuminate(tmp_path, d):
+    # seul vendor/laravel/framework/src/Illuminate est exclu : un autre dossier de laravel/* reste scanne
+    p = tmp_path / 'vendor' / d
+    p.mkdir(parents=True)
+    (p / 'z.php').write_text("<?php Schema::connection('legacy')->create('t');")
+    assert len(extract.foreign_connections(str(tmp_path))) == 1
+
+
+def test_laravel_paquet_en_lien_scanne(tmp_path):
+    # paquet Composer de type path : vendor/pkg est un lien vers le code du paquet
+    cible = tmp_path / 'pkgsrc' / 'database' / 'migrations'
+    cible.mkdir(parents=True)
+    (cible / 'e.php').write_text("<?php Schema::connection('legacy')->create('t');")
+    repo = tmp_path / 'repo'
+    (repo / 'vendor').mkdir(parents=True)
+    try:
+        os.symlink(tmp_path / 'pkgsrc', repo / 'vendor' / 'pkg', target_is_directory=True)
+    except OSError:
+        pytest.skip('liens symboliques non autorises sur ce poste')
+    assert len(extract.foreign_connections(str(repo))) == 1
+
+
 def test_laravel_refuse_sans_trust_repo(tmp_path):
     code, out = extract_cli('--laravel', str(tmp_path), '--out', os.devnull)
     assert code != 0 and '--trust-repo' in out

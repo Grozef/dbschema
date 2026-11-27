@@ -401,7 +401,15 @@ CONN_ANY = re.compile(r"""function\s+getConnection(?:Name)?\s*\(|->setConnection
 def foreign_connections(repo):
     """Migrations (repo et vendor) qui visent une autre connexion que 'mysql' : elles ecriraient hors de la base jetable."""
     bad = []
-    for f in glob.glob(os.path.join(repo, '**', 'migrations', '**', '*.php'), recursive=True):
+    # Dossiers migrations en toute casse et sur tout OS (loadMigrationsFrom(__DIR__.'/Migrations')), sauf le code du
+    # framework (vendor/laravel/framework/src/Illuminate) : sous Windows et macOS l'ancien glob prenait
+    # Illuminate/Database/Migrations/ (Migrator, getConnection) pour des migrations et refusait tout Laravel neuf (2026-11-27).
+    files = []
+    for d, _, names in os.walk(repo, followlinks=True):
+        parts = [p.lower() for p in os.path.relpath(d, repo).split(os.sep)]
+        if 'migrations' in parts and parts[:5] != ['vendor', 'laravel', 'framework', 'src', 'illuminate']:
+            files += [os.path.join(d, n) for n in names if n.lower().endswith('.php')]
+    for f in files:
         for m in CONN.finditer(open(f, encoding='utf-8', errors='replace').read()):
             val = next(g for g in m.groups() if g is not None).strip()
             if val[:1] not in '\'"' or val.strip('\'"') != 'mysql':
