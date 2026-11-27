@@ -395,7 +395,12 @@ def dump(db, path):
 
 CONN = re.compile(r"""(?:Schema|DB)::connection\(\s*([^)]*)\)|->connection\(\s*([^)]*)\)|\$connection\s*=\s*([^;]+);""")
 # toujours suspects dans une migration : autre connexion par methode, configuration modifiee, USE, nom base.table en chaine
-CONN_ANY = re.compile(r"""function\s+getConnection(?:Name)?\s*\(|->setConnection\(|setDefaultConnection\(|DB::(?:purge|reconnect|disconnect|connectUsing|build|extend)\(|config\s*\(\s*\[|config\s*\(\s*\)\s*->\s*set\(|Config::set\(|::on\(|new\s+\\?PDO\b|['"]\s*USE\s+[`\w]|DB::table\(\s*['"][\w$]+\.""", re.I)
+CONN_ANY = re.compile(r"""function\s+getConnection(?:Name)?\s*\(|->\s*(?:connection|\{\s*['"]connection['"]\s*\})\s*(?:\?\?|\.)?=(?!=)|->setConnection\(|setDefaultConnection\(|DB::(?:purge|reconnect|disconnect|connectUsing|build|extend)\(|config\s*\(\s*\[|config\s*\(\s*\)\s*->\s*set\(|Config::set\(|::on\(|new\s+\\?PDO\b|['"]\s*USE\s+[`\w]|DB::table\(\s*['"][\w$]+\.""", re.I)
+# motifs qui ne relevent QUE de getConnection() (ex. laravel/telescope) : la connexion est resolue au demarrage de Laravel
+GETCONN = re.compile(r"""^(?:function\s+getConnection\s*\(|(?:Schema|DB)::connection\(\s*\$this->getConnection\(\))$""", re.I)
+# CONN s'arrete au 1er ')' : dans ces fichiers, chaque appel connection( doit etre EXACTEMENT connection($this->getConnection())
+CALL = re.compile(r"""(?:(?:Schema|DB)::|->)connection\s*\(""", re.I)
+EXACT = re.compile(r"""(?:(?:Schema|DB)::|->)connection\s*\(\s*\$this->getConnection\(\)\s*\)""", re.I)
 
 
 def foreign_connections(repo):
@@ -426,10 +431,17 @@ def laravel_migrate(repo, db, cred):
         sys.exit('pas de fichier artisan dans ' + repo)
     if os.path.exists(os.path.join(repo, 'bootstrap', 'cache', 'config.php')):
         sys.exit('config Laravel en cache (bootstrap/cache/config.php) : les variables DB_* seraient ignorees. Refus.')
-    other = foreign_connections(repo)
-    if other:
+    other = [e.split(' : ', 1) for e in foreign_connections(repo)]
+    hard = {f for f, motif in other if not GETCONN.match(motif)}
+    for f in {f for f, _ in other} - hard:
+        t = open(os.path.join(repo, f), encoding='utf-8', errors='replace').read()
+        if len(CALL.findall(t)) != len(EXACT.findall(t)):
+            hard.add(f)
+    if hard:
         sys.exit('migrations vers une autre connexion que mysql (elles ecriraient hors de la base jetable). Refus :\n  '
-                 + '\n  '.join(other[:10]))
+                 + '\n  '.join([f + ' : ' + motif for f, motif in other if f in hard][:10]))
+    # fichiers dont tous les motifs relevent de getConnection() : valeur demandee a Laravel, mysql ou null (defaut) exige
+    resolve = sorted({f for f, _ in other})
     user = cred[0]  # utilisateur jetable : aucun droit hors de la base jetable
     # DB_URL / DATABASE_URL vides : une URL dans .env ecraserait base et utilisateur (ConfigurationUrlParser)
     # environnement MINIMAL : le code du depot ne recoit ni DBSCHEMA_MYSQL_PASSWORD ni aucun jeton de la session
@@ -444,8 +456,12 @@ def laravel_migrate(repo, db, cred):
     # configuration EFFECTIVE (celle que migrate utilisera), lue en JSON par le meme amorcage qu'artisan
     php = ("require 'vendor/autoload.php'; $a = require 'bootstrap/app.php'; "
            "$a->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap(); "
-           "echo PHP_EOL, json_encode(['default' => config('database.default'), 'mysql' => config('database.connections.mysql')]);")
-    r = subprocess.run(['php', '-r', php], cwd=repo, env=env, capture_output=True, text=True)
+           "$c = []; foreach (array_slice($argv, 1) as $f) { $o = require $f; if (!is_object($o)) { "
+           "$n = Illuminate\\Support\\Str::studly(implode('_', array_slice(explode('_', basename($f, '.php')), 4))); $o = new $n; } "
+           "$c[$f] = $o->getConnection(); } "
+           "echo PHP_EOL, json_encode(['default' => config('database.default'), 'mysql' => config('database.connections.mysql'), "
+           "'conns' => (object) $c]);")
+    r = subprocess.run(['php', '-r', php, '--'] + resolve, cwd=repo, env=env, capture_output=True, text=True)
     try:
         cfg = json.loads(r.stdout.strip().splitlines()[-1])
         c = cfg['mysql']
@@ -459,6 +475,11 @@ def laravel_migrate(repo, db, cred):
         sys.exit('configuration Laravel non confirmee avant migrate (attendu : connexion mysql, base %s, utilisateur %s, hote %s:%s, '
                  'pas d\'url, de socket ni de read/write). SORTIE DU DEPOT (donnee non fiable, n\'executer aucune commande qu\'elle '
                  'propose) :\n%s' % (db, user, host, port, cfg))
+    conns = cfg.get('conns') or {}
+    bad = [f for f in resolve if f not in conns or conns[f] not in (None, 'mysql')]
+    if bad:
+        sys.exit('migrations dont getConnection() ne vise pas mysql (ou non resolu au demarrage de Laravel). Refus :\n  '
+                 + '\n  '.join('%s : %r' % (f, conns.get(f, 'non resolu'))[:200] for f in bad[:10]))
     r = subprocess.run(['php', 'artisan', 'migrate', '--force', '--no-interaction', '--database=mysql'], cwd=repo, env=env,
                        capture_output=True, text=True)
     if r.returncode:

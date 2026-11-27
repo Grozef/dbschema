@@ -124,3 +124,67 @@ def test_migration_vers_autre_connexion_refusee(repo, fake):
     with pytest.raises(SystemExit, match='autre connexion'):
         extract.laravel_migrate(str(repo), DB, (USER, PW))
     assert fake.calls == []
+
+
+# migration de laravel/telescope (v5.29.0) : connexion lue dans sa config, resolue au demarrage de Laravel
+TELE = ("<?php return new class extends Migration {\n"
+        "    public function getConnection(): ?string { return config('telescope.storage.database.connection'); }\n"
+        "    public function up(): void { $schema = Schema::connection($this->getConnection()); }\n};")
+
+
+@pytest.fixture
+def tele(repo):
+    d = repo / 'vendor' / 'laravel' / 'telescope' / 'database' / 'migrations'
+    d.mkdir(parents=True)
+    (d / '2018_08_08_100000_create_telescope_entries_table.php').write_text(TELE)
+    return os.path.join('vendor', 'laravel', 'telescope', 'database', 'migrations',
+                        '2018_08_08_100000_create_telescope_entries_table.php')
+
+
+@pytest.mark.parametrize('val', ['mysql', None])
+def test_getconnection_resolu_vers_mysql_ou_defaut_accepte(repo, fake, tele, val):
+    fake.cfg = {**GOOD, 'conns': {tele: val}}
+    extract.laravel_migrate(str(repo), DB, (USER, PW))
+    assert tele in fake.calls[0][3:]  # le fichier est passe au php -r qui resout getConnection()
+    assert migrated(fake)
+
+
+@pytest.mark.parametrize('conns', [{'TELE': 'legacy'}, {}], ids=['autre connexion', 'non resolu'])
+def test_getconnection_non_confirme_refuse(repo, fake, tele, conns):
+    fake.cfg = {**GOOD, 'conns': {tele if k == 'TELE' else k: v for k, v in conns.items()}}
+    with pytest.raises(SystemExit, match='ne vise pas mysql'):
+        extract.laravel_migrate(str(repo), DB, (USER, PW))
+    assert not migrated(fake)
+
+
+def test_plusieurs_fichiers_un_seul_hors_mysql_refuse(repo, fake, tele):
+    autre = os.path.join('database', 'migrations', 'z.php')
+    (repo / autre).write_text(TELE)
+    fake.cfg = {**GOOD, 'conns': {tele: None, autre: 'legacy'}}
+    with pytest.raises(SystemExit, match='ne vise pas mysql') as e:
+        extract.laravel_migrate(str(repo), DB, (USER, PW))
+    assert autre in str(e.value) and tele not in str(e.value) and not migrated(fake)
+
+
+@pytest.mark.parametrize('up', [
+    "Schema::connection($this->getConnection() ?? 'legacy')->create('x');",       # motif tronque au 1er ')'
+    "DB::connection($this->getConnection() . '_old')->table('t')->insert([]);",
+    "$this->connection = 'legacy'; Schema::connection($this->getConnection())->create('x');",  # etat change dans up()
+    "$this->connection ??= 'legacy'; Schema::connection($this->getConnection())->create('x');",
+    "$this->connection .= '_old'; Schema::connection($this->getConnection())->create('x');",
+    "$t = $this; $t->connection = 'legacy'; Schema::connection($this->getConnection())->create('x');",
+    "$this->{'connection'} = 'legacy'; Schema::connection($this->getConnection())->create('x');",
+], ids=['coalescence', 'concatenation', 'affectation', 'affectation ??=', 'affectation .=', 'alias', 'acces dynamique'])
+def test_getconnection_detourne_refuse_sans_php(repo, fake, up):
+    (repo / 'database' / 'migrations' / 'w.php').write_text(
+        "<?php return new class extends Migration { public function up(): void { " + up + " } };")
+    with pytest.raises(SystemExit, match='autre connexion'):
+        extract.laravel_migrate(str(repo), DB, (USER, PW))
+    assert fake.calls == []
+
+
+def test_getconnection_plus_autre_motif_refuse_sans_php(repo, fake):
+    (repo / 'database' / 'migrations' / 'y.php').write_text(TELE + "\nSchema::connection('legacy')->create('y');")
+    with pytest.raises(SystemExit, match='autre connexion'):
+        extract.laravel_migrate(str(repo), DB, (USER, PW))
+    assert fake.calls == []
