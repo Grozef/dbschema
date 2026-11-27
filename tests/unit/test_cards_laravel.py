@@ -93,6 +93,14 @@ def test_laravel_paquet_en_lien_scanne(tmp_path):
     assert len(extract.foreign_connections(str(repo))) == 1
 
 
+def test_laravel_connexion_affectee_dans_le_constructeur_refusee(tmp_path):
+    # $this->connection = ... (constructeur ou up()) : le Migrator le lit par getConnection()
+    mig = tmp_path / 'database' / 'migrations'
+    mig.mkdir(parents=True)
+    (mig / 'c.php').write_text("<?php return new class extends Migration { function __construct() { $this->connection = 'legacy'; } };")
+    assert len(extract.foreign_connections(str(tmp_path))) == 1
+
+
 def test_laravel_refuse_sans_trust_repo(tmp_path):
     code, out = extract_cli('--laravel', str(tmp_path), '--out', os.devnull)
     assert code != 0 and '--trust-repo' in out
